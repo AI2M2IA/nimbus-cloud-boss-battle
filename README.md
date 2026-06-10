@@ -1,0 +1,82 @@
+# AWS Boss Battle
+
+A gamified version of the SAA-C03 practice exam ("simulado") from *Let's Learn AWS Together*, built with Godot 4. Each exam domain is a boss fight.
+
+## How it plays
+
+Pick a boss on the menu — one per exam domain, plus a cross-domain warm-up and the Final Gauntlet (all 65 exam questions):
+
+| Boss | Domain |
+|---|---|
+| The Cloud Gatekeeper | Cross-domain warm-up |
+| The Breach Baron | D1 · Design Secure Architectures |
+| The Chaos Monkey King | D2 · Design Resilient Architectures |
+| The Latency Demon | D3 · High-Performing Architectures |
+| Bill Shock, Budget Devourer | D4 · Cost-Optimized Architectures |
+| The Examiner | Final Gauntlet (full exam set) |
+
+Mechanics, designed for learning:
+
+- **Correct answer** → damage the boss. Streaks build a combo multiplier (up to 2x XP). Every 4-streak restores a heart.
+- **Wrong answer** → lose a heart, and the question is re-queued a few rounds later — you must beat every question to defeat the boss (active recall).
+- **Every answer shows the explanation**, right or wrong.
+- XP, ranks (Cloud Novice → Solutions Architect Hero), best accuracy and best streak persist between sessions (`user://save.json`; on web exports this lives in browser storage).
+
+## Game modes
+
+Besides the boss battles, the main menu offers three modes that draw from the full question pool (all domains, shuffled; each question is asked at most once per run — no requeue):
+
+- **Survival** — three wrong answers end the run. No heart regen, no second chances. Score is how many questions you answered correctly.
+- **Points Decay** — start with **1000 points**; a wrong answer costs **100**, a correct one earns **50**. The pool is clamped at 0, and hitting 0 ends the run.
+- **Save the Pet** — pick a pet (cat, dog, parrot, or fish) on the menu card. **20 correct answers save it**; **3 wrong answers** and the pet is lost. A loss takes precedence if both thresholds are hit.
+
+All modes keep the combo/XP rules from the boss battles, show every explanation, and record a per-mode best score and attempt count in the save file. The thresholds live in `scripts/mode_rules.gd` as pure, unit-tested functions.
+
+## Languages
+
+UI strings are translated through flat JSON files in `data/i18n/` (`en.json` is the fallback; `pt-BR.json` ships as the first translation). Languages that have a file appear in the in-game language picker on the main menu. AWS service names stay in English in every language. Question content itself is currently English only.
+
+## Run it
+
+1. Install [Godot 4.3+](https://godotengine.org/download) (standard build, not .NET).
+2. Open Godot → Import → select this folder's `project.godot`.
+3. Press F5 (Run Project).
+
+## Export to HTML (play in the browser)
+
+1. In Godot: Editor → Manage Export Templates → Download and Install.
+2. Project → Export… → Add… → **Web**.
+3. Set the export path (e.g. `build/web/index.html`) → Export Project.
+4. Serve the folder over HTTP (browsers block `file://` for wasm):
+   `python3 -m http.server -d build/web 8000` → open http://localhost:8000
+5. For GitHub Pages: commit the exported files. If the page hangs on load, add a `coi-serviceworker` shim or set the export's "Head Include" per Godot's [Web export docs](https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_web.html) (Pages can't send the COOP/COEP headers Godot's threads need; in Export → Web you can also disable "Thread Support" to avoid this entirely).
+
+## Unit tests
+
+Game rules live in `scripts/battle_rules.gd` and `scripts/mode_rules.gd` (pure functions) and are covered by `tests/run_tests.gd`, along with question-bank integrity, save/record logic, mode win/lose boundaries (Survival, Points Decay, Save the Pet), and i18n consistency (key parity and matching format placeholders between `en.json` and `pt-BR.json`). Run headless from the project folder:
+
+```
+godot --headless --path . -s tests/run_tests.gd
+```
+
+(macOS: `godot` is `/Applications/Godot.app/Contents/MacOS/Godot` if you haven't aliased it.) Exits 0 on success, 1 on failure — CI-friendly. Your save file is snapshotted and restored by the tests.
+
+## Updating the questions
+
+`data/questions.json` is a copy of `docs/api/questions.json` from the book site. To sync after editing the book's simulado, just copy the file over again — the game reads it at startup, nothing else to change.
+
+## Project layout
+
+```
+project.godot           # Godot 4 config (GL Compatibility renderer — web-friendly)
+data/questions.json     # question bank (98 questions, SAA-C03 domains)
+data/i18n/              # UI translations (en.json fallback, pt-BR.json, ...)
+scenes/                 # minimal scenes; UI is built in code
+scripts/game_state.gd   # autoload: question bank, battles, modes, i18n, save data
+scripts/main_menu.gd    # boss select, game modes, language picker
+scripts/battle.gd       # boss battle loop, combo, requeue, results
+scripts/battle_rules.gd # pure boss-battle rules (unit-tested)
+scripts/mode_rules.gd   # pure mode rules: Survival, Points Decay, Save the Pet
+scripts/mode_battle.gd  # run loop for the extra game modes
+scripts/ui_theme.gd     # shared styles (no art assets needed)
+```

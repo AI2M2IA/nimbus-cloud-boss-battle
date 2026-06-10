@@ -1,0 +1,212 @@
+extends Control
+## Boss-select screen, plus the extra game modes and language picker.
+## All UI is built in code.
+
+const ModeRules := preload("res://scripts/mode_rules.gd")
+
+
+func _ready() -> void:
+	var bg := ColorRect.new()
+	bg.color = UITheme.BG
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(bg)
+
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scroll)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 48)
+	margin.add_theme_constant_override("margin_right", 48)
+	margin.add_theme_constant_override("margin_top", 32)
+	margin.add_theme_constant_override("margin_bottom", 32)
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.add_child(margin)
+
+	var root := VBoxContainer.new()
+	root.add_theme_constant_override("separation", 18)
+	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.add_child(root)
+
+	var title := UITheme.label(Game.t("menu.title"), 42, UITheme.ACCENT)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	root.add_child(title)
+
+	var sub := UITheme.label(Game.t("menu.subtitle"), 18, UITheme.TEXT_DIM)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	root.add_child(sub)
+
+	var xp := UITheme.label(Game.t("menu.xp_rank") % [Game.total_xp(), Game.player_rank()], 20, UITheme.GOOD)
+	xp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	root.add_child(xp)
+
+	root.add_child(_make_language_row())
+
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 18)
+	grid.add_theme_constant_override("v_separation", 18)
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_child(grid)
+
+	for battle in Game.BATTLES:
+		grid.add_child(_make_card(battle))
+
+	var hint := UITheme.label(Game.t("menu.hint"), 14, UITheme.TEXT_DIM)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	root.add_child(hint)
+
+	# --- extra game modes (Survival, Points Decay, Save the Pet)
+	var modes_title := UITheme.label(Game.t("menu.modes_title"), 28, UITheme.ACCENT)
+	modes_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	root.add_child(modes_title)
+
+	var modes_hint := UITheme.label(Game.t("menu.modes_hint"), 14, UITheme.TEXT_DIM)
+	modes_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	root.add_child(modes_hint)
+
+	var modes_grid := GridContainer.new()
+	modes_grid.columns = 3
+	modes_grid.add_theme_constant_override("h_separation", 18)
+	modes_grid.add_theme_constant_override("v_separation", 18)
+	modes_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_child(modes_grid)
+
+	for mode in Game.MODES:
+		modes_grid.add_child(_make_mode_card(mode))
+
+
+func _make_language_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 8)
+	row.add_child(UITheme.label(Game.t("menu.language"), 14, UITheme.TEXT_DIM))
+
+	var picker := OptionButton.new()
+	var langs: Array = Game.available_languages()
+	for i in range(langs.size()):
+		picker.add_item(String(langs[i]["name"]), i)
+		if String(langs[i]["code"]) == Game.lang:
+			picker.select(i)
+	var on_language_picked := func(idx: int) -> void:
+		Game.set_language(String(langs[idx]["code"]))
+		get_tree().reload_current_scene()
+	picker.item_selected.connect(on_language_picked)
+	row.add_child(picker)
+	return row
+
+
+func _make_card(battle: Dictionary) -> PanelContainer:
+	var color := Color(String(battle["color"]))
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", UITheme.panel_box(UITheme.PANEL, 14, 18))
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.custom_minimum_size = Vector2(340, 200)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	card.add_child(box)
+
+	var name_label := UITheme.label(String(battle["boss"]), 22, color)
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(name_label)
+
+	var sub := UITheme.label(String(battle["subtitle"]), 14, UITheme.TEXT_DIM)
+	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(sub)
+
+	var count := Game.questions_for_battle(String(battle["id"])).size()
+	box.add_child(UITheme.label(Game.t("menu.card_stats") % [count, int(battle["hearts"])], 14, UITheme.TEXT))
+
+	var rec := Game.battle_record(String(battle["id"]))
+	var status := Game.t("menu.not_fought")
+	var status_color := UITheme.TEXT_DIM
+	if not rec.is_empty():
+		if rec.get("defeated", false):
+			status = Game.t("menu.defeated") % [int(round(float(rec.get("best_accuracy", 0.0)) * 100.0)), int(rec.get("best_streak", 0))]
+			status_color = UITheme.GOOD
+		else:
+			status = Game.t("menu.attempts") % [int(rec.get("attempts", 0)), int(round(float(rec.get("best_accuracy", 0.0)) * 100.0))]
+			status_color = UITheme.BAD
+	box.add_child(UITheme.label(status, 13, status_color))
+
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(spacer)
+
+	var fight := Button.new()
+	fight.text = Game.t("menu.fight")
+	fight.add_theme_font_size_override("font_size", 18)
+	UITheme.style_button(fight, color.darkened(0.35))
+	fight.pressed.connect(_on_fight_pressed.bind(String(battle["id"])))
+	box.add_child(fight)
+
+	return card
+
+
+func _make_mode_card(mode: Dictionary) -> PanelContainer:
+	var id := String(mode["id"])
+	var color := Color(String(mode["color"]))
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", UITheme.panel_box(UITheme.PANEL, 14, 18))
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.custom_minimum_size = Vector2(340, 190)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	card.add_child(box)
+
+	var name_label := UITheme.label(Game.t(String(mode["name_key"])), 22, color)
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(name_label)
+
+	var desc := UITheme.label(Game.t(String(mode["desc_key"])), 14, UITheme.TEXT_DIM)
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(desc)
+
+	var rec := Game.mode_record(id)
+	var status := Game.t("menu.not_fought")
+	var status_color := UITheme.TEXT_DIM
+	if not rec.is_empty():
+		status = Game.t("menu.mode_record") % [int(rec.get("best_score", 0)), int(rec.get("attempts", 0))]
+		status_color = UITheme.GOOD
+	box.add_child(UITheme.label(status, 13, status_color))
+
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(spacer)
+
+	if id == "pet":
+		box.add_child(UITheme.label(Game.t("mode.pet.pick"), 13, UITheme.TEXT_DIM))
+		var pets := HBoxContainer.new()
+		pets.add_theme_constant_override("separation", 8)
+		for p in ModeRules.PETS:
+			var pet_btn := Button.new()
+			pet_btn.text = Game.t("pet.%s" % p)
+			pet_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			UITheme.style_button(pet_btn, color.darkened(0.35))
+			pet_btn.pressed.connect(_on_mode_pressed.bind(id, String(p)))
+			pets.add_child(pet_btn)
+		box.add_child(pets)
+	else:
+		var start := Button.new()
+		start.text = Game.t("mode.start")
+		start.add_theme_font_size_override("font_size", 18)
+		UITheme.style_button(start, color.darkened(0.35))
+		start.pressed.connect(_on_mode_pressed.bind(id, Game.selected_pet))
+		box.add_child(start)
+
+	return card
+
+
+func _on_fight_pressed(id: String) -> void:
+	Game.selected_battle_id = id
+	get_tree().change_scene_to_file("res://scenes/battle.tscn")
+
+
+func _on_mode_pressed(id: String, pet: String) -> void:
+	Game.selected_mode = id
+	Game.selected_pet = pet
+	get_tree().change_scene_to_file("res://scenes/mode_battle.tscn")
