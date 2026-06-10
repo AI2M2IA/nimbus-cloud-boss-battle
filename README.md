@@ -34,7 +34,11 @@ All modes keep the combo/XP rules from the boss battles, show every explanation,
 
 ## Languages
 
-UI strings are translated through flat JSON files in `data/i18n/` (`en.json` is the fallback; `pt-BR.json` ships as the first translation). Languages that have a file appear in the in-game language picker on the main menu. AWS service names stay in English in every language. Question content itself is currently English only.
+UI strings are translated through flat JSON files in `data/i18n/`, with `en.json` as the fallback. The shipped set mirrors the book's `chapters/` reference list — 20 languages: en, ar, bn, de, es, fr, he, hi, id, it, ja, ko, pt, ru, sw, th, tr, ur, vi, zh (`pt-BR.json` is an alias of `pt.json`). Languages listed in `LANGS` (`scripts/game_state.gd`) that have a file appear in the in-game language picker. AWS service names stay in English in every language. Question content itself is currently English only.
+
+The test suite enforces translation health: every language file must load, match `en.json`'s key set exactly, and keep format placeholders (`%d`, `%s`, `%.1f`) in the same order as English. To add a language: create `data/i18n/<code>.json` with all keys and add the entry to `LANGS`.
+
+Script-coverage note: on desktop, Godot falls back to system fonts for non-Latin scripts (Arabic, Devanagari, Bengali, Thai, CJK, etc.), so they render out of the box. Web exports cannot use system fonts — if you publish the HTML build for those languages, bundle Noto fonts and set them as theme font fallbacks.
 
 ## Run it
 

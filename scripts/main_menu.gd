@@ -42,6 +42,7 @@ func _ready() -> void:
 	root.add_child(xp)
 
 	root.add_child(_make_language_row())
+	root.add_child(_make_extras_row())
 
 	var grid := GridContainer.new()
 	grid.columns = 3
@@ -66,6 +67,13 @@ func _ready() -> void:
 	var modes_hint := UITheme.label(Game.t("menu.modes_hint"), 14, UITheme.TEXT_DIM)
 	modes_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(modes_hint)
+
+	# Active question pool the game modes draw from (built-in or custom set).
+	var active_set := Game.get_custom_set(Game.active_set_id())
+	var pool_name: String = Game.t("custom.builtin") if active_set.is_empty() else String(active_set["name"])
+	var pool_label := UITheme.label(Game.t("menu.active_set") % pool_name, 13, UITheme.GOOD if not active_set.is_empty() else UITheme.TEXT_DIM)
+	pool_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	root.add_child(pool_label)
 
 	var modes_grid := GridContainer.new()
 	modes_grid.columns = 3
@@ -95,6 +103,28 @@ func _make_language_row() -> HBoxContainer:
 		get_tree().reload_current_scene()
 	picker.item_selected.connect(on_language_picked)
 	row.add_child(picker)
+	return row
+
+
+## Custom Quiz and Leaderboard entries, between the language picker and bosses.
+func _make_extras_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 12)
+
+	var custom_btn := Button.new()
+	custom_btn.text = Game.t("menu.custom")
+	custom_btn.add_theme_font_size_override("font_size", 15)
+	UITheme.style_button(custom_btn, UITheme.PANEL_LIGHT)
+	custom_btn.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/custom_quiz.tscn"))
+	row.add_child(custom_btn)
+
+	var lb_btn := Button.new()
+	lb_btn.text = Game.t("menu.leaderboard")
+	lb_btn.add_theme_font_size_override("font_size", 15)
+	UITheme.style_button(lb_btn, UITheme.PANEL_LIGHT)
+	lb_btn.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/leaderboard.tscn"))
+	row.add_child(lb_btn)
 	return row
 
 

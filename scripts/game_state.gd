@@ -1,8 +1,14 @@
 extends Node
-## Autoload "Game" — question bank, battle definitions, save data.
+## Autoload "Game" — question bank, battle definitions, save data,
+## custom question sets, and the local leaderboard.
+
+const QuizImport := preload("res://scripts/quiz_import.gd")
+const Leaderboard := preload("res://scripts/leaderboard.gd")
 
 const QUESTIONS_PATH := "res://data/questions.json"
 const SAVE_PATH := "user://save.json"
+const CUSTOM_SETS_PATH := "user://custom_sets.json"
+const LEADERBOARD_PATH := "user://leaderboard.json"
 
 const BATTLES := [
 	{
@@ -93,6 +99,7 @@ const LANGS := [
 	{"code": "de", "name": "Deutsch"},
 	{"code": "ja", "name": "日本語"},
 	{"code": "sw", "name": "Kiswahili"},
+	{"code": "it", "name": "Italiano"},
 	{"code": "tr", "name": "Türkçe"},
 	{"code": "vi", "name": "Tiếng Việt"},
 	{"code": "ko", "name": "한국어"},
@@ -106,6 +113,10 @@ var selected_battle_id: String = "d0"
 var selected_mode: String = "survival"
 var selected_pet: String = "cat"
 var lang: String = "en"
+## Player-authored question sets: [{id, name, questions: [...]}, ...].
+var custom_sets: Array = []
+## Ranked leaderboard entries (see scripts/leaderboard.gd for the shape).
+var leaderboard_entries: Array = []
 var _strings: Dictionary = {}
 var _fallback: Dictionary = {}
 
@@ -113,6 +124,8 @@ var _fallback: Dictionary = {}
 func _ready() -> void:
 	_load_questions()
 	_load_save()
+	_load_custom_sets()
+	_load_leaderboard()
 	_fallback = _load_lang_file("en")
 	lang = String(save_data.get("lang", "en"))
 	_strings = _fallback if lang == "en" else _load_lang_file(lang)
@@ -183,6 +196,150 @@ func all_questions_shuffled() -> Array:
 	var pool := questions.duplicate()
 	pool.shuffle()
 	return pool
+
+
+# ---------------------------------------------------------------- custom sets
+
+## The question pool the extra game modes draw from: the active custom set
+## when one is selected, otherwise the built-in bank. Boss battles always
+## use the built-in bank (custom sets may not cover every domain).
+func mode_pool_shuffled() -> Array:
+	var set_data := get_custom_set(active_set_id())
+	if set_data.is_empty():
+		return all_questions_shuffled()
+	var pool: Array = (set_data.get("questions", []) as Array).duplicate()
+	pool.shuffle()
+	return pool
+
+
+func list_custom_sets() -> Array:
+	return custom_sets
+
+
+func get_custom_set(id: String) -> Dictionary:
+	for s in custom_sets:
+		if String(s.get("id", "")) == id:
+			return s
+	return {}
+
+
+## Save (or replace) a named custom set. The questions are expected to be
+## already validated with QuizImport.validate_bank. Returns the set id.
+func save_custom_set(set_name: String, new_questions: Array) -> String:
+	var id := _custom_set_id(set_name)
+	var existing := get_custom_set(id)
+	if existing.is_empty():
+		custom_sets.append({"id": id, "name": set_name.strip_edges(), "questions": new_questions})
+	else:
+		existing["name"] = set_name.strip_edges()
+		existing["questions"] = new_questions
+	_write_custom_sets()
+	return id
+
+
+## Append one validated question to a set, creating the set if needed.
+## Returns the QuizImport.validate_bank verdict for the resulting set.
+func append_to_custom_set(set_name: String, question: Dictionary) -> Dictionary:
+	var id := _custom_set_id(set_name)
+	var set_data := get_custom_set(id)
+	var qs: Array = (set_data.get("questions", []) as Array).duplicate()
+	qs.append(question)
+	var verdict: Dictionary = QuizImport.validate_bank({"questions": qs})
+	if verdict["ok"]:
+		save_custom_set(set_name if set_data.is_empty() else String(set_data["name"]), qs)
+	return verdict
+
+
+func remove_custom_set(id: String) -> void:
+	for i in range(custom_sets.size()):
+		if String(custom_sets[i].get("id", "")) == id:
+			custom_sets.remove_at(i)
+			break
+	if active_set_id() == id:
+		set_active_set("")
+	_write_custom_sets()
+
+
+## "" selects the built-in bank; otherwise a custom set id. Persisted.
+func set_active_set(id: String) -> void:
+	save_data["active_set"] = id
+	_write_save()
+
+
+func active_set_id() -> String:
+	var id := String(save_data.get("active_set", ""))
+	return id if not get_custom_set(id).is_empty() else ""
+
+
+## Deterministic id from the set name, so re-importing under the same
+## name replaces the set instead of piling up duplicates.
+func _custom_set_id(set_name: String) -> String:
+	var slug := ""
+	for ch in set_name.strip_edges().to_lower():
+		slug += ch if (ch >= "a" and ch <= "z") or (ch >= "0" and ch <= "9") else "-"
+	while slug.contains("--"):
+		slug = slug.replace("--", "-")
+	slug = slug.lstrip("-").rstrip("-")
+	return "set-" + (slug if slug != "" else "unnamed")
+
+
+func _write_custom_sets() -> void:
+	var f := FileAccess.open(CUSTOM_SETS_PATH, FileAccess.WRITE)
+	if f != null:
+		f.store_string(JSON.stringify({"sets": custom_sets}))
+
+
+func _load_custom_sets() -> void:
+	custom_sets = []
+	if not FileAccess.file_exists(CUSTOM_SETS_PATH):
+		return
+	var f := FileAccess.open(CUSTOM_SETS_PATH, FileAccess.READ)
+	if f == null:
+		return
+	var data = JSON.parse_string(f.get_as_text())
+	if typeof(data) == TYPE_DICTIONARY and typeof(data.get("sets")) == TYPE_ARRAY:
+		custom_sets = data["sets"]
+
+
+# ---------------------------------------------------------------- leaderboard
+
+## Record one finished run on the local leaderboard and remember the name
+## for the next prompt. mode_key is one of Leaderboard.MODES.
+func record_score(player_name: String, mode_key: String, score: int) -> Dictionary:
+	var entry: Dictionary = Leaderboard.make_entry(
+		player_name, mode_key, score, Time.get_datetime_string_from_system(true))
+	leaderboard_entries = Leaderboard.insert_entry(leaderboard_entries, entry)
+	save_data["player_name"] = String(entry["name"])
+	_write_save()
+	_write_leaderboard()
+	return entry
+
+
+func leaderboard_top(mode_key: String, n: int = Leaderboard.DEFAULT_TOP_N) -> Array:
+	return Leaderboard.top_for_mode(leaderboard_entries, mode_key, n)
+
+
+## Last name the player entered at a game-over prompt ("" if never).
+func last_player_name() -> String:
+	return String(save_data.get("player_name", ""))
+
+
+func _write_leaderboard() -> void:
+	var f := FileAccess.open(LEADERBOARD_PATH, FileAccess.WRITE)
+	if f != null:
+		f.store_string(JSON.stringify({"version": 1, "entries": leaderboard_entries}))
+
+
+func _load_leaderboard() -> void:
+	leaderboard_entries = []
+	if not FileAccess.file_exists(LEADERBOARD_PATH):
+		return
+	var f := FileAccess.open(LEADERBOARD_PATH, FileAccess.READ)
+	if f == null:
+		return
+	var data = JSON.parse_string(f.get_as_text())
+	if typeof(data) == TYPE_DICTIONARY and typeof(data.get("entries")) == TYPE_ARRAY:
+		leaderboard_entries = Leaderboard.sort_entries(data["entries"])
 
 
 ## Languages that actually have a translation file shipped with the game.
