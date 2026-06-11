@@ -8,6 +8,7 @@ const ModeRules := preload("res://scripts/mode_rules.gd")
 const GameState := preload("res://scripts/game_state.gd")
 const QuizImport := preload("res://scripts/quiz_import.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd")
+const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
 
 var checks := 0
 var failures := 0
@@ -16,6 +17,7 @@ var failures := 0
 func _initialize() -> void:
 	_test_rules()
 	_test_modes()
+	_test_pet_avatar()
 	_test_question_bank()
 	_test_game_state()
 	_test_i18n()
@@ -139,6 +141,22 @@ func _test_modes() -> void:
 	gs.save_data = backup
 	gs._write_save()
 	gs.free()
+
+
+# --------------------------------------------------------------- pet avatar
+
+func _test_pet_avatar() -> void:
+	print("[pet_avatar]")
+	var avatar = PetAvatarScript.new()
+	avatar.set_pet("dog")
+	check(avatar.pet_id == "dog", "dog avatar selected")
+	avatar.set_pet("dragon")
+	check(avatar.pet_id == "cat", "unknown pet falls back to cat")
+	avatar.set_progress(7, 20, 1, 3)
+	check(is_equal_approx(avatar.progress_ratio(), 0.35), "pet progress ratio")
+	avatar.set_progress(99, 20, 9, 3)
+	check(is_equal_approx(avatar.progress_ratio(), 1.0), "pet progress caps at 1.0")
+	avatar.free()
 
 
 # ------------------------------------------------------------ question bank

@@ -28,7 +28,7 @@ Besides the boss battles, the main menu offers three modes that draw from the fu
 
 - **Survival** — three wrong answers end the run. No heart regen, no second chances. Score is how many questions you answered correctly.
 - **Points Decay** — start with **1000 points**; a wrong answer costs **100**, a correct one earns **50**. The pool is clamped at 0, and hitting 0 ends the run.
-- **Save the Pet** — pick a pet (cat, dog, parrot, or fish) on the menu card. **20 correct answers save it**; **3 wrong answers** and the pet is lost. A loss takes precedence if both thresholds are hit.
+- **Save the Pet** — pick a pet (cat, dog, parrot, or fish) on the menu card. **20 correct answers save it**; **3 wrong answers** and the pet is lost. A loss takes precedence if both thresholds are hit. The chosen pet appears on screen as a small animated cartoon avatar and reacts to correct and wrong answers.
 
 All modes keep the combo/XP rules from the boss battles, show every explanation, and record a per-mode best score and attempt count in the save file. The thresholds live in `scripts/mode_rules.gd` as pure, unit-tested functions.
 
@@ -46,6 +46,8 @@ Script-coverage note: on desktop, Godot falls back to system fonts for non-Latin
 2. Open Godot → Import → select this folder's `project.godot`.
 3. Press F5 (Run Project).
 
+From a terminal, `./godot.sh` launches the project and `./run-game.sh` is kept as a readable alias. The shortcut locates Godot from `$GODOT`, `PATH`, or the standard macOS app path.
+
 ## Export to HTML (play in the browser)
 
 1. In Godot: Editor → Manage Export Templates → Download and Install.
@@ -60,10 +62,10 @@ Script-coverage note: on desktop, Godot falls back to system fonts for non-Latin
 Game rules live in `scripts/battle_rules.gd` and `scripts/mode_rules.gd` (pure functions) and are covered by `tests/run_tests.gd`, along with question-bank integrity, save/record logic, mode win/lose boundaries (Survival, Points Decay, Save the Pet), and i18n consistency (key parity and matching format placeholders between `en.json` and `pt-BR.json`). Run headless from the project folder:
 
 ```
-godot --headless --path . -s tests/run_tests.gd
+./run-tests.sh
 ```
 
-(macOS: `godot` is `/Applications/Godot.app/Contents/MacOS/Godot` if you haven't aliased it.) Exits 0 on success, 1 on failure — CI-friendly. Your save file is snapshotted and restored by the tests.
+You can also pass raw Godot arguments through the shortcut, for example `./godot.sh --headless --path . -s tests/run_tests.gd`. Exits 0 on success, 1 on failure — CI-friendly. Your save file is snapshotted and restored by the tests.
 
 ## Updating the questions
 
@@ -73,6 +75,7 @@ godot --headless --path . -s tests/run_tests.gd
 
 ```
 project.godot           # Godot 4 config (GL Compatibility renderer — web-friendly)
+godot.sh                # local Godot shortcut; no args runs this project
 data/questions.json     # question bank (98 questions, SAA-C03 domains)
 data/i18n/              # UI translations (en.json fallback, pt-BR.json, ...)
 scenes/                 # minimal scenes; UI is built in code
@@ -82,5 +85,6 @@ scripts/battle.gd       # boss battle loop, combo, requeue, results
 scripts/battle_rules.gd # pure boss-battle rules (unit-tested)
 scripts/mode_rules.gd   # pure mode rules: Survival, Points Decay, Save the Pet
 scripts/mode_battle.gd  # run loop for the extra game modes
+scripts/pet_avatar.gd   # animated cartoon pet renderer for Save the Pet
 scripts/ui_theme.gd     # shared styles (no art assets needed)
 ```

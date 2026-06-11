@@ -8,6 +8,7 @@ extends Control
 
 const Rules := preload("res://scripts/battle_rules.gd")
 const ModeRules := preload("res://scripts/mode_rules.gd")
+const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
 
 var mode: Dictionary
 var mode_id: String = "survival"
@@ -40,6 +41,7 @@ var explain_panel: PanelContainer
 var verdict_label: Label
 var explain_text: RichTextLabel
 var continue_btn: Button
+var pet_avatar: PetAvatar
 
 
 func _ready() -> void:
@@ -99,6 +101,18 @@ func _build_ui() -> void:
 	status_box.add_child(streak_label)
 	xp_label = UITheme.label("", 14, UITheme.ACCENT)
 	status_box.add_child(xp_label)
+
+	if mode_id == "pet":
+		var pet_stage := CenterContainer.new()
+		pet_stage.custom_minimum_size = Vector2(0, 154)
+		pet_stage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		root.add_child(pet_stage)
+
+		pet_avatar = PetAvatarScript.new()
+		pet_avatar.custom_minimum_size = Vector2(260, 150)
+		pet_avatar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		pet_avatar.set_pet(pet)
+		pet_stage.add_child(pet_avatar)
 
 	# --- question card
 	var card := PanelContainer.new()
@@ -269,6 +283,7 @@ func _evaluate(chosen: Array) -> void:
 		xp_earned += gained
 		verdict_label.text = Game.t("battle.hit") % [gained, Rules.multiplier(streak)]
 		verdict_label.add_theme_color_override("font_color", UITheme.GOOD)
+		_update_pet_reaction(true)
 	else:
 		wrong_count += 1
 		streak = 0
@@ -279,6 +294,7 @@ func _evaluate(chosen: Array) -> void:
 		else:
 			verdict_label.text = Game.t("run.wrong_strikes") % [wrong_count, ModeRules.SURVIVAL_MAX_WRONG]
 		verdict_label.add_theme_color_override("font_color", UITheme.BAD)
+		_update_pet_reaction(false)
 
 	if mode_id == "decay":
 		points = ModeRules.decay_points(points, correct)
@@ -324,6 +340,17 @@ func _update_hud() -> void:
 	status_label.text = _status_text()
 	streak_label.text = Game.t("battle.combo") % [streak, best_streak]
 	xp_label.text = Game.t("battle.xp") % xp_earned
+	if pet_avatar != null:
+		pet_avatar.set_progress(correct_count, ModeRules.PET_GOAL_CORRECT, wrong_count, ModeRules.PET_MAX_WRONG)
+
+
+func _update_pet_reaction(correct: bool) -> void:
+	if pet_avatar == null:
+		return
+	if correct:
+		pet_avatar.react_correct(correct_count, ModeRules.PET_GOAL_CORRECT)
+	else:
+		pet_avatar.react_wrong(wrong_count, ModeRules.PET_MAX_WRONG)
 
 
 func _status_text() -> String:
@@ -379,6 +406,15 @@ func _end_run(victory: bool) -> void:
 		sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		box.add_child(sub)
+
+	if mode_id == "pet":
+		var final_avatar = PetAvatarScript.new()
+		final_avatar.custom_minimum_size = Vector2(210, 152)
+		final_avatar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		final_avatar.set_pet(pet)
+		final_avatar.set_progress(correct_count, ModeRules.PET_GOAL_CORRECT, wrong_count, ModeRules.PET_MAX_WRONG)
+		final_avatar.set_final_state(victory)
+		box.add_child(final_avatar)
 
 	box.add_child(UITheme.label(Game.t("run.final_score") % [correct_count, answered_count], 16))
 	box.add_child(UITheme.label(Game.t("battle.best_combo") % best_streak, 16))

@@ -3,6 +3,7 @@ extends Control
 ## All UI is built in code.
 
 const ModeRules := preload("res://scripts/mode_rules.gd")
+const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
 
 
 func _ready() -> void:
@@ -182,7 +183,7 @@ func _make_mode_card(mode: Dictionary) -> PanelContainer:
 	var card := PanelContainer.new()
 	card.add_theme_stylebox_override("panel", UITheme.panel_box(UITheme.PANEL, 14, 18))
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	card.custom_minimum_size = Vector2(340, 190)
+	card.custom_minimum_size = Vector2(340, 290 if id == "pet" else 190)
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
@@ -213,12 +214,24 @@ func _make_mode_card(mode: Dictionary) -> PanelContainer:
 		var pets := HBoxContainer.new()
 		pets.add_theme_constant_override("separation", 8)
 		for p in ModeRules.PETS:
+			var choice := VBoxContainer.new()
+			choice.add_theme_constant_override("separation", 4)
+			choice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+			var avatar = PetAvatarScript.new()
+			avatar.custom_minimum_size = Vector2(72, 64)
+			avatar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			avatar.set_pet(String(p))
+			choice.add_child(avatar)
+
 			var pet_btn := Button.new()
 			pet_btn.text = Game.t("pet.%s" % p)
 			pet_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			pet_btn.add_theme_font_size_override("font_size", 14)
 			UITheme.style_button(pet_btn, color.darkened(0.35))
 			pet_btn.pressed.connect(_on_mode_pressed.bind(id, String(p)))
-			pets.add_child(pet_btn)
+			choice.add_child(pet_btn)
+			pets.add_child(choice)
 		box.add_child(pets)
 	else:
 		var start := Button.new()
