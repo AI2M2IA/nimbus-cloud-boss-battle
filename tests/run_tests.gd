@@ -8,6 +8,7 @@ const ModeRules := preload("res://scripts/mode_rules.gd")
 const GameState := preload("res://scripts/game_state.gd")
 const QuizImport := preload("res://scripts/quiz_import.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd")
+const ReviewScheduler := preload("res://scripts/review_scheduler.gd")
 const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
 
 var checks := 0
@@ -26,6 +27,7 @@ func _initialize() -> void:
 	_test_custom_sets()
 	_test_leaderboard_persistence()
 	_test_mode_sessions()
+	_test_review_scheduler()
 	print("--------------------------------------------------")
 	print("%d checks, %d failure(s)" % [checks, failures])
 	quit(1 if failures > 0 else 0)
@@ -448,3 +450,27 @@ func _test_mode_sessions() -> void:
 	check(ModeRules.pet_outcome(20, 0) == "saved", "the pet is saved at 20 correct")
 	check(ModeRules.pet_outcome(5, 3) == "lost", "the pet is lost at 3 wrong")
 	check(ModeRules.is_valid_pet("cat") and not ModeRules.is_valid_pet("dragon"), "pet validation")
+
+
+# ----------------------------------------------------------- review scheduler
+
+func _test_review_scheduler() -> void:
+	print("[review_scheduler]")
+	var rs = ReviewScheduler.new()
+	var card = rs.new_card("fc-1", "1", 0)
+	check(int(card["box"]) == 1, "new card starts in box 1")
+	check(int(card["times_seen"]) == 0, "new card unseen")
+	check(rs.is_due(card, 0), "box 1 card is always due")
+	var promoted = rs.mark(card, true, 0)
+	check(int(promoted["box"]) == 2, "success promotes to box 2")
+	check(int(promoted["times_seen"]) == 1, "seen count increments")
+	check(not rs.is_due(promoted, 1), "box 2 not due after 1 day")
+	check(rs.is_due(promoted, 2), "box 2 due after 2 days")
+	var reset = rs.mark(promoted, false, 5)
+	check(int(reset["box"]) == 1, "failure resets to box 1")
+	check(rs.interval_for_box(1) == 0 and rs.interval_for_box(2) == 2 and rs.interval_for_box(3) == 5 and rs.interval_for_box(4) == 10, "box intervals 0/2/5/10")
+	var capped = rs.mark(rs.mark(rs.mark(rs.mark(card, true, 0), true, 0), true, 0), true, 0)
+	check(int(capped["box"]) == 4, "box caps at 4")
+	var cards = rs.ensure_cards_for_questions([], [{"id": "fc-a", "domain": "1"}, {"id": "fc-b", "domain": "2"}])
+	check(cards.size() == 2, "ensure builds a card per item")
+	check(rs.due_cards(cards, 0, "1").size() == 1, "due_cards filters by domain")
