@@ -2,7 +2,7 @@ extends Control
 class_name PetAvatar
 ## Cartoon pet renderer and reactions for Save the Pet mode.
 
-const PET_IDS := ["cat", "dog", "parrot", "fish"]
+const PET_IDS := ["cat", "dog", "parrot", "fish", "hamster"]
 const MOOD_IDLE := "idle"
 const MOOD_HAPPY := "happy"
 const MOOD_WORRIED := "worried"
@@ -149,6 +149,8 @@ func _draw() -> void:
 			_draw_parrot()
 		"fish":
 			_draw_fish()
+		"hamster":
+			_draw_hamster()
 		_:
 			_draw_cat()
 	if _mood == MOOD_HAPPY or _mood == MOOD_SAVED:
@@ -242,6 +244,31 @@ func _draw_fish() -> void:
 	draw_poly([Vector2(-3, 27), Vector2(18, 55), Vector2(26, 21)], fin)
 	draw_line(Vector2(32, -24), Vector2(45, -13), OUTLINE, 2.0, true)
 	draw_line(Vector2(36, 23), Vector2(48, 8), OUTLINE, 2.0, true)
+	_draw_face(face, 0.92)
+
+
+func _draw_hamster() -> void:
+	var body := Color("#e3a96b")
+	var belly := Color("#ffe9c9")
+	var ear := Color("#caa17a")
+	var face := Vector2(0, -14)
+
+	draw_circle(Vector2(-20, 54), 9, OUTLINE)
+	draw_circle(Vector2(-20, 54), 6, body.lightened(0.12))
+	draw_circle(Vector2(20, 54), 9, OUTLINE)
+	draw_circle(Vector2(20, 54), 6, body.lightened(0.12))
+	_draw_ellipse_shape(Vector2(0, 22), Vector2(50, 42), body)
+	_draw_ellipse_shape(Vector2(0, 30), Vector2(30, 26), belly, false)
+	draw_circle(Vector2(-26, -40), 14, OUTLINE)
+	draw_circle(Vector2(-26, -40), 10, ear)
+	draw_circle(Vector2(26, -40), 14, OUTLINE)
+	draw_circle(Vector2(26, -40), 10, ear)
+	draw_circle(Vector2(0, -16), 42, OUTLINE)
+	draw_circle(Vector2(0, -16), 38, body)
+	_draw_ellipse_shape(Vector2(-30, -2), Vector2(16, 14), body.lightened(0.1), false)
+	_draw_ellipse_shape(Vector2(30, -2), Vector2(16, 14), body.lightened(0.1), false)
+	_draw_ellipse_shape(Vector2(0, -4), Vector2(13, 10), belly, false)
+	draw_circle(Vector2(0, -10), 4, OUTLINE)
 	_draw_face(face, 0.92)
 
 

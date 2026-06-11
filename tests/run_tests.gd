@@ -118,9 +118,10 @@ func _test_modes() -> void:
 	check(ModeRules.pet_outcome(0, 3) == "lost", "pet lost at exactly 3 wrong")
 	check(ModeRules.pet_outcome(19, 3) == "lost", "pet lost at 3 wrong even with 19 correct")
 	check(ModeRules.pet_outcome(20, 3) == "lost", "loss takes precedence over win")
-	check(ModeRules.PETS.size() == 4, "4 pets available")
+	check(ModeRules.PETS.size() == 5, "5 pets available")
 	check(ModeRules.is_valid_pet("cat") and ModeRules.is_valid_pet("fish"), "cat and fish are valid pets")
 	check(not ModeRules.is_valid_pet("dragon"), "dragon is not a pet")
+	check(ModeRules.is_valid_pet("hamster"), "hamster is a valid pet")
 
 	# Mode wiring in game_state.
 	var gs = GameState.new()
