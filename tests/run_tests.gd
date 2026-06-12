@@ -29,6 +29,7 @@ func _initialize() -> void:
 	_test_mode_sessions()
 	_test_review_scheduler()
 	_test_text_scale()
+	_test_branding()
 	print("--------------------------------------------------")
 	print("%d checks, %d failure(s)" % [checks, failures])
 	quit(1 if failures > 0 else 0)
@@ -489,3 +490,17 @@ func _test_text_scale() -> void:
 	check(GameState.stepped_scale(1.0, -0.15) < 1.0, "minus decreases scale")
 	check(GameState.stepped_scale(GameState.TEXT_SCALE_MAX, 0.15) == GameState.TEXT_SCALE_MAX, "clamps at max")
 	check(GameState.stepped_scale(GameState.TEXT_SCALE_MIN, -0.15) == GameState.TEXT_SCALE_MIN, "clamps at min")
+
+# ------------------------------------------------------------------- branding
+
+func _test_branding() -> void:
+	print("[branding]")
+	check(String(ProjectSettings.get_setting("application/config/name", "")) == "Nimbus Cloud Boss Battle", "project name is the official title")
+	var gs = GameState.new()
+	var bad := 0
+	for l in gs.LANGS:
+		var d = gs._load_lang_file(String(l["code"]))
+		if String(d.get("menu.title", "")) != "NIMBUS CLOUD BOSS BATTLE":
+			bad += 1
+	check(bad == 0, "menu.title is the official name in all %d locales" % gs.LANGS.size())
+	gs.free()
