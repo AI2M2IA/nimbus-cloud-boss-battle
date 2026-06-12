@@ -136,7 +136,7 @@ func _build_ui() -> void:
 	stem_text.fit_content = true
 	stem_text.scroll_active = false
 	stem_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	stem_text.add_theme_font_size_override("normal_font_size", 18)
+	stem_text.add_theme_font_size_override("normal_font_size", UITheme.fs(18))
 	stem_text.add_theme_color_override("default_color", UITheme.TEXT)
 	card_box.add_child(stem_text)
 
@@ -148,7 +148,7 @@ func _build_ui() -> void:
 	confirm_btn = Button.new()
 	confirm_btn.text = Game.t("battle.confirm")
 	confirm_btn.visible = false
-	confirm_btn.add_theme_font_size_override("font_size", 16)
+	confirm_btn.add_theme_font_size_override("font_size", UITheme.fs(16))
 	UITheme.style_button(confirm_btn, UITheme.ACCENT.darkened(0.3))
 	confirm_btn.pressed.connect(_on_confirm_pressed)
 	card_box.add_child(confirm_btn)
@@ -169,13 +169,13 @@ func _build_ui() -> void:
 	explain_text.fit_content = true
 	explain_text.scroll_active = false
 	explain_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	explain_text.add_theme_font_size_override("normal_font_size", 15)
+	explain_text.add_theme_font_size_override("normal_font_size", UITheme.fs(15))
 	explain_text.add_theme_color_override("default_color", UITheme.TEXT)
 	ex_box.add_child(explain_text)
 
 	continue_btn = Button.new()
 	continue_btn.text = Game.t("battle.continue")
-	continue_btn.add_theme_font_size_override("font_size", 16)
+	continue_btn.add_theme_font_size_override("font_size", UITheme.fs(16))
 	UITheme.style_button(continue_btn, UITheme.GOOD.darkened(0.4))
 	continue_btn.pressed.connect(_on_continue_pressed)
 	ex_box.add_child(continue_btn)
@@ -213,7 +213,7 @@ func _next_question() -> void:
 		var btn := Button.new()
 		btn.text = "%s)  %s" % [key, String(opt.get("text", ""))]
 		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		btn.add_theme_font_size_override("font_size", 16)
+		btn.add_theme_font_size_override("font_size", UITheme.fs(16))
 		btn.set("autowrap_mode", TextServer.AUTOWRAP_WORD_SMART)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		UITheme.style_button(btn, UITheme.PANEL_LIGHT)
@@ -430,14 +430,14 @@ func _end_run(victory: bool) -> void:
 
 	var retry := Button.new()
 	retry.text = Game.t("run.retry")
-	retry.add_theme_font_size_override("font_size", 16)
+	retry.add_theme_font_size_override("font_size", UITheme.fs(16))
 	UITheme.style_button(retry, mode_color.darkened(0.35))
 	retry.pressed.connect(func() -> void: get_tree().reload_current_scene())
 	buttons.add_child(retry)
 
 	var menu := Button.new()
 	menu.text = Game.t("battle.back")
-	menu.add_theme_font_size_override("font_size", 16)
+	menu.add_theme_font_size_override("font_size", UITheme.fs(16))
 	UITheme.style_button(menu, UITheme.PANEL_LIGHT)
 	menu.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
 	buttons.add_child(menu)
@@ -487,7 +487,7 @@ func _make_score_row(score: int) -> VBoxContainer:
 
 	var save_btn := Button.new()
 	save_btn.text = Game.t("lb.save_score")
-	save_btn.add_theme_font_size_override("font_size", 14)
+	save_btn.add_theme_font_size_override("font_size", UITheme.fs(14))
 	UITheme.style_button(save_btn, UITheme.ACCENT.darkened(0.3))
 	var on_save := func() -> void:
 		Game.record_score(name_edit.text, mode_id, score)

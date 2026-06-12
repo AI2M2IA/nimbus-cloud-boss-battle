@@ -108,5 +108,7 @@
   "flashcards.got_it": "Lo sé",
   "flashcards.again": "Otra vez",
   "flashcards.complete": "¡Todo al día, vuelve mañana!",
-  "flashcards.back": "Volver al menú"
+  "flashcards.back": "Volver al menú",
+  "menu.text_smaller": "Texto más pequeño",
+  "menu.text_larger": "Texto más grande"
 }

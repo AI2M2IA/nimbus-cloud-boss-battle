@@ -28,6 +28,7 @@ func _initialize() -> void:
 	_test_leaderboard_persistence()
 	_test_mode_sessions()
 	_test_review_scheduler()
+	_test_text_scale()
 	print("--------------------------------------------------")
 	print("%d checks, %d failure(s)" % [checks, failures])
 	quit(1 if failures > 0 else 0)
@@ -479,3 +480,12 @@ func _test_review_scheduler() -> void:
 	check(gsf.flashcards.size() == 186, "186 flashcards loaded from data")
 	check(rs.ensure_cards_for_questions([], gsf.flashcards).size() == 186, "a review card is built per flashcard")
 	gsf.free()
+
+# --------------------------------------------------------------- text scale
+
+func _test_text_scale() -> void:
+	print("[text_scale]")
+	check(GameState.stepped_scale(1.0, 0.15) > 1.0, "plus increases scale")
+	check(GameState.stepped_scale(1.0, -0.15) < 1.0, "minus decreases scale")
+	check(GameState.stepped_scale(GameState.TEXT_SCALE_MAX, 0.15) == GameState.TEXT_SCALE_MAX, "clamps at max")
+	check(GameState.stepped_scale(GameState.TEXT_SCALE_MIN, -0.15) == GameState.TEXT_SCALE_MIN, "clamps at min")

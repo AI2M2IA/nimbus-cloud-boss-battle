@@ -58,7 +58,7 @@ func _ready() -> void:
 
 	var back := Button.new()
 	back.text = Game.t("battle.back")
-	back.add_theme_font_size_override("font_size", 16)
+	back.add_theme_font_size_override("font_size", UITheme.fs(16))
 	UITheme.style_button(back, UITheme.PANEL_LIGHT)
 	back.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
 	var back_row := HBoxContainer.new()

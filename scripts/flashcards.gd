@@ -56,7 +56,7 @@ func _build_ui() -> void:
 	_card_btn.custom_minimum_size = Vector2(620, 220)
 	_card_btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_card_btn.clip_text = false
-	_card_btn.add_theme_font_size_override("font_size", 20)
+	_card_btn.add_theme_font_size_override("font_size", UITheme.fs(20))
 	UITheme.style_button(_card_btn, UITheme.PANEL_LIGHT)
 	_card_btn.pressed.connect(_on_card_pressed)
 	col.add_child(_card_btn)
@@ -72,21 +72,21 @@ func _build_ui() -> void:
 
 	_again_btn = Button.new()
 	_again_btn.text = Game.t("flashcards.again")
-	_again_btn.add_theme_font_size_override("font_size", 16)
+	_again_btn.add_theme_font_size_override("font_size", UITheme.fs(16))
 	UITheme.style_button(_again_btn, UITheme.BAD)
 	_again_btn.pressed.connect(_on_grade.bind(false))
 	_action_row.add_child(_again_btn)
 
 	_got_btn = Button.new()
 	_got_btn.text = Game.t("flashcards.got_it")
-	_got_btn.add_theme_font_size_override("font_size", 16)
+	_got_btn.add_theme_font_size_override("font_size", UITheme.fs(16))
 	UITheme.style_button(_got_btn, UITheme.GOOD)
 	_got_btn.pressed.connect(_on_grade.bind(true))
 	_action_row.add_child(_got_btn)
 
 	var back := Button.new()
 	back.text = Game.t("flashcards.back")
-	back.add_theme_font_size_override("font_size", 14)
+	back.add_theme_font_size_override("font_size", UITheme.fs(14))
 	UITheme.style_button(back, UITheme.PANEL_LIGHT)
 	back.pressed.connect(_on_back)
 	col.add_child(back)
