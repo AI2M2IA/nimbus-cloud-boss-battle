@@ -28,17 +28,25 @@ Besides the boss battles, the main menu offers three modes that draw from the fu
 
 - **Survival** — three wrong answers end the run. No heart regen, no second chances. Score is how many questions you answered correctly.
 - **Points Decay** — start with **1000 points**; a wrong answer costs **100**, a correct one earns **50**. The pool is clamped at 0, and hitting 0 ends the run.
-- **Save the Pet** — pick a pet (cat, dog, parrot, or fish) on the menu card. **20 correct answers save it**; **3 wrong answers** and the pet is lost. A loss takes precedence if both thresholds are hit. The chosen pet appears on screen as a small animated cartoon avatar and reacts to correct and wrong answers.
+- **Save the Pet** — pick a pet (cat, dog, parrot, fish, or hamster) on the menu card. **20 correct answers save it**; **3 wrong answers** and the pet is lost. A loss takes precedence if both thresholds are hit. The chosen pet appears on screen as a small animated cartoon avatar and reacts to correct and wrong answers.
 
 All modes keep the combo/XP rules from the boss battles, show every explanation, and record a per-mode best score and attempt count in the save file. The thresholds live in `scripts/mode_rules.gd` as pure, unit-tested functions.
 
+## Flashcards (Leitner)
+
+A spaced-repetition study mode over the book's **186 flashcards** (`data/flashcards.json`). Each card shows a term; click it to flip to the definition (with a flip animation), then grade yourself **Got it** or **Again**. "Got it" promotes the card through Leitner boxes (review intervals of 0 / 2 / 5 / 10 days); "Again" sends it back to box 1. Box state persists in the save. The scheduling logic lives in `scripts/review_scheduler.gd` (pure, unit-tested).
+
 ## Languages
 
-UI strings are translated through flat JSON files in `data/i18n/`, with `en.json` as the fallback. The shipped set mirrors the book's `chapters/` reference list — 20 languages: en, ar, bn, de, es, fr, he, hi, id, it, ja, ko, pt, ru, sw, th, tr, ur, vi, zh (`pt-BR.json` is an alias of `pt.json`). Languages listed in `LANGS` (`scripts/game_state.gd`) that have a file appear in the in-game language picker. AWS service names stay in English in every language. Question content itself is currently English only.
+UI strings are translated through flat JSON files in `data/i18n/`, with `en.json` as the fallback. The shipped set mirrors the book's `chapters/` reference list — 19 languages: en, ar, bn, de, es, fr, he, hi, id, ja, ko, pt, ru, sw, th, tr, ur, vi, zh (`pt-BR.json` is an alias of `pt.json`). Languages listed in `LANGS` (`scripts/game_state.gd`) that have a file appear in the in-game language picker. AWS service names stay in English in every language. Question content itself is currently English only.
 
 The test suite enforces translation health: every language file must load, match `en.json`'s key set exactly, and keep format placeholders (`%d`, `%s`, `%.1f`) in the same order as English. To add a language: create `data/i18n/<code>.json` with all keys and add the entry to `LANGS`.
 
 Script-coverage note: on desktop, Godot falls back to system fonts for non-Latin scripts (Arabic, Devanagari, Bengali, Thai, CJK, etc.), so they render out of the box. Web exports cannot use system fonts — if you publish the HTML build for those languages, bundle Noto fonts and set them as theme font fallbacks.
+
+## Accessibility
+
+A text-size control (**A− / A / A+**) sits next to the language picker: shrink, reset to default, or enlarge all in-game text. The scale (0.85×–1.5×) persists in the save and applies on startup across every screen.
 
 ## Run it
 
@@ -77,6 +85,7 @@ You can also pass raw Godot arguments through the shortcut, for example `./godot
 project.godot           # Godot 4 config (GL Compatibility renderer — web-friendly)
 godot.sh                # local Godot shortcut; no args runs this project
 data/questions.json     # question bank (98 questions, SAA-C03 domains)
+data/flashcards.json    # 186 Leitner flashcards (from the book)
 data/i18n/              # UI translations (en.json fallback, pt-BR.json, ...)
 scenes/                 # minimal scenes; UI is built in code
 scripts/game_state.gd   # autoload: question bank, battles, modes, i18n, save data
@@ -85,6 +94,8 @@ scripts/battle.gd       # boss battle loop, combo, requeue, results
 scripts/battle_rules.gd # pure boss-battle rules (unit-tested)
 scripts/mode_rules.gd   # pure mode rules: Survival, Points Decay, Save the Pet
 scripts/mode_battle.gd  # run loop for the extra game modes
+scripts/flashcards.gd   # Leitner flashcard review screen
+scripts/review_scheduler.gd # pure Leitner spaced-repetition rules (unit-tested)
 scripts/pet_avatar.gd   # animated cartoon pet renderer for Save the Pet
 scripts/ui_theme.gd     # shared styles (no art assets needed)
 ```
