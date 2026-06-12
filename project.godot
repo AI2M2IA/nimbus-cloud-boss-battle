@@ -14,8 +14,8 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
-config/name="AWS Boss Battle"
-config/description="Gamified SAA-C03 practice exam. Defeat the domain bosses by answering AWS questions."
+config/name="Nimbus Cloud Boss Battle"
+config/description="Unofficial gamified study game for the AWS SAA-C03 exam. Defeat the cloud domain bosses, rescue your pet, and drill flashcards."
 run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.6")
 config/icon="res://icon.svg"

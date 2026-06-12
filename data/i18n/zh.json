@@ -1,5 +1,5 @@
 {
-  "menu.title": "AWS BOSS BATTLE",
+  "menu.title": "NIMBUS CLOUD BOSS BATTLE",
   "menu.subtitle": "SAA-C03 模拟考试，游戏化版本。击败每个领域的Boss。",
   "menu.xp_rank": "XP：%d   -   段位：%s",
   "menu.language": "语言",
@@ -24,6 +24,7 @@
   "pet.dog": "狗",
   "pet.parrot": "鹦鹉",
   "pet.fish": "鱼",
+  "pet.hamster": "仓鼠",
   "battle.you": "你",
   "battle.confirm": "确认（选两项）",
   "battle.continue": "继续",
@@ -98,5 +99,17 @@
   "lb.record_score": "排行榜得分：%d",
   "lb.your_name": "你的名字",
   "lb.save_score": "保存分数",
-  "lb.saved": "已保存到排行榜！"
+  "lb.saved": "已保存到排行榜！",
+  "menu.flashcards": "Flashcards",
+  "flashcards.title": "Flashcards (Leitner)",
+  "flashcards.cards": "Cards",
+  "flashcards.flip_hint": "Click the card to flip",
+  "flashcards.grade_hint": "Did you know it?",
+  "flashcards.got_it": "Got it",
+  "flashcards.again": "Again",
+  "flashcards.complete": "All caught up — come back tomorrow!",
+  "flashcards.back": "Back to menu",
+  "menu.text_smaller": "Smaller text",
+  "menu.text_larger": "Larger text",
+  "menu.text_default": "Default text size"
 }

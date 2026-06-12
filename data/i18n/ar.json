@@ -1,5 +1,5 @@
 {
-  "menu.title": "AWS BOSS BATTLE",
+  "menu.title": "NIMBUS CLOUD BOSS BATTLE",
   "menu.subtitle": "اختبار تدريبي SAA-C03 بأسلوب لعبة. اهزم كل زعماء المجالات.",
   "menu.xp_rank": "XP: %d   -   الرتبة: %s",
   "menu.language": "اللغة",
@@ -24,6 +24,7 @@
   "pet.dog": "كلب",
   "pet.parrot": "ببغاء",
   "pet.fish": "سمكة",
+  "pet.hamster": "هامستر",
   "battle.you": "أنت",
   "battle.confirm": "تأكيد (اختر 2)",
   "battle.continue": "متابعة",
@@ -98,5 +99,17 @@
   "lb.record_score": "نتيجة لوحة الصدارة: %d",
   "lb.your_name": "اسمك",
   "lb.save_score": "احفظ النتيجة",
-  "lb.saved": "حُفظت في لوحة الصدارة!"
+  "lb.saved": "حُفظت في لوحة الصدارة!",
+  "menu.flashcards": "Flashcards",
+  "flashcards.title": "Flashcards (Leitner)",
+  "flashcards.cards": "Cards",
+  "flashcards.flip_hint": "Click the card to flip",
+  "flashcards.grade_hint": "Did you know it?",
+  "flashcards.got_it": "Got it",
+  "flashcards.again": "Again",
+  "flashcards.complete": "All caught up — come back tomorrow!",
+  "flashcards.back": "Back to menu",
+  "menu.text_smaller": "Smaller text",
+  "menu.text_larger": "Larger text",
+  "menu.text_default": "Default text size"
 }

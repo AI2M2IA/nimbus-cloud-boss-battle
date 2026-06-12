@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Instructions for any AI agent (and any human contributor) working in this repository. **AWS Boss Battle** is a free, open-source, pseudonymous study game. Three policies below are MANDATORY for every contribution.
+Instructions for any AI agent (and any human contributor) working in this repository. **Nimbus Cloud Boss Battle** is a free, open-source, pseudonymous study game. Three policies below are MANDATORY for every contribution.
 
 ## Identity Policy (MANDATORY)
 

@@ -1,5 +1,5 @@
 {
-  "menu.title": "AWS BOSS BATTLE",
+  "menu.title": "NIMBUS CLOUD BOSS BATTLE",
   "menu.subtitle": "SAA-C03模擬試験をゲーム化。各ドメインのボスを倒せ。",
   "menu.xp_rank": "XP: %d   -   ランク: %s",
   "menu.language": "言語",
@@ -24,6 +24,7 @@
   "pet.dog": "イヌ",
   "pet.parrot": "オウム",
   "pet.fish": "サカナ",
+  "pet.hamster": "ハムスター",
   "battle.you": "あなた",
   "battle.confirm": "決定（2つ選択）",
   "battle.continue": "つづける",
@@ -98,5 +99,17 @@
   "lb.record_score": "ランキングスコア: %d",
   "lb.your_name": "あなたの名前",
   "lb.save_score": "スコアを保存",
-  "lb.saved": "ランキングに保存しました！"
+  "lb.saved": "ランキングに保存しました！",
+  "menu.flashcards": "Flashcards",
+  "flashcards.title": "Flashcards (Leitner)",
+  "flashcards.cards": "Cards",
+  "flashcards.flip_hint": "Click the card to flip",
+  "flashcards.grade_hint": "Did you know it?",
+  "flashcards.got_it": "Got it",
+  "flashcards.again": "Again",
+  "flashcards.complete": "All caught up — come back tomorrow!",
+  "flashcards.back": "Back to menu",
+  "menu.text_smaller": "Smaller text",
+  "menu.text_larger": "Larger text",
+  "menu.text_default": "Default text size"
 }

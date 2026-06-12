@@ -11,6 +11,10 @@ const BAD := Color("#ff5d5d")
 const ACCENT := Color("#ff9900")
 
 
+static func fs(n: int) -> int:
+	return int(round(float(n) * Game.text_scale))
+
+
 static func panel_box(color: Color = PANEL, radius: int = 12, margin: int = 16) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = color
@@ -45,6 +49,6 @@ static func style_button(btn: Button, base: Color, text_color: Color = TEXT) -> 
 static func label(text: String, size: int, color: Color = TEXT) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", UITheme.fs(size))
 	l.add_theme_color_override("font_color", color)
 	return l

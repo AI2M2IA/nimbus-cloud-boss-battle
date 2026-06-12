@@ -7,6 +7,10 @@ const Leaderboard := preload("res://scripts/leaderboard.gd")
 
 const QUESTIONS_PATH := "res://data/questions.json"
 const SAVE_PATH := "user://save.json"
+const FLASHCARDS_PATH := "res://data/flashcards.json"
+const TEXT_SCALE_MIN := 0.85
+const TEXT_SCALE_MAX := 1.5
+const TEXT_SCALE_STEP := 0.15
 const CUSTOM_SETS_PATH := "user://custom_sets.json"
 const LEADERBOARD_PATH := "user://leaderboard.json"
 
@@ -99,7 +103,6 @@ const LANGS := [
 	{"code": "de", "name": "Deutsch"},
 	{"code": "ja", "name": "日本語"},
 	{"code": "sw", "name": "Kiswahili"},
-	{"code": "it", "name": "Italiano"},
 	{"code": "tr", "name": "Türkçe"},
 	{"code": "vi", "name": "Tiếng Việt"},
 	{"code": "ko", "name": "한국어"},
@@ -108,6 +111,8 @@ const LANGS := [
 ]
 
 var questions: Array = []
+var flashcards: Array = []
+var text_scale: float = 1.0
 var save_data: Dictionary = {"xp": 0, "battles": {}}
 var selected_battle_id: String = "d0"
 var selected_mode: String = "survival"
@@ -123,10 +128,12 @@ var _fallback: Dictionary = {}
 
 func _ready() -> void:
 	_load_questions()
+	_load_flashcards()
 	_load_save()
 	_load_custom_sets()
 	_load_leaderboard()
 	_fallback = _load_lang_file("en")
+	text_scale = float(save_data.get("text_scale", 1.0))
 	lang = String(save_data.get("lang", "en"))
 	_strings = _fallback if lang == "en" else _load_lang_file(lang)
 
@@ -421,3 +428,35 @@ func _load_save() -> void:
 	var data = JSON.parse_string(f.get_as_text())
 	if typeof(data) == TYPE_DICTIONARY:
 		save_data = data
+
+func _load_flashcards() -> void:
+	var f := FileAccess.open(FLASHCARDS_PATH, FileAccess.READ)
+	if f == null:
+		return
+	var data = JSON.parse_string(f.get_as_text())
+	if typeof(data) == TYPE_DICTIONARY and data.has("flashcards"):
+		flashcards = data["flashcards"]
+
+func review_cards() -> Array:
+	return save_data.get("review_cards", [])
+
+func save_review_cards(cards: Array) -> void:
+	save_data["review_cards"] = cards
+	_write_save()
+
+func today_day() -> int:
+	return int(Time.get_unix_time_from_system() / 86400.0)
+
+static func stepped_scale(current: float, delta: float) -> float:
+	return clampf(current + delta, TEXT_SCALE_MIN, TEXT_SCALE_MAX)
+
+func adjust_text_scale(delta: float) -> float:
+	text_scale = stepped_scale(text_scale, delta)
+	save_data["text_scale"] = text_scale
+	_write_save()
+	return text_scale
+
+func reset_text_scale() -> void:
+	text_scale = 1.0
+	save_data["text_scale"] = 1.0
+	_write_save()

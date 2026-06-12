@@ -1,5 +1,5 @@
 {
-  "menu.title": "AWS BOSS BATTLE",
+  "menu.title": "NIMBUS CLOUD BOSS BATTLE",
   "menu.subtitle": "SAA-C03 모의고사를 게임으로. 모든 도메인 보스를 물리치세요.",
   "menu.xp_rank": "XP: %d   -   랭크: %s",
   "menu.language": "언어",
@@ -24,6 +24,7 @@
   "pet.dog": "강아지",
   "pet.parrot": "앵무새",
   "pet.fish": "물고기",
+  "pet.hamster": "햄스터",
   "battle.you": "당신",
   "battle.confirm": "확인 (2개 선택)",
   "battle.continue": "계속",
@@ -98,5 +99,17 @@
   "lb.record_score": "리더보드 점수: %d",
   "lb.your_name": "이름",
   "lb.save_score": "점수 저장",
-  "lb.saved": "리더보드에 저장했습니다!"
+  "lb.saved": "리더보드에 저장했습니다!",
+  "menu.flashcards": "Flashcards",
+  "flashcards.title": "Flashcards (Leitner)",
+  "flashcards.cards": "Cards",
+  "flashcards.flip_hint": "Click the card to flip",
+  "flashcards.grade_hint": "Did you know it?",
+  "flashcards.got_it": "Got it",
+  "flashcards.again": "Again",
+  "flashcards.complete": "All caught up — come back tomorrow!",
+  "flashcards.back": "Back to menu",
+  "menu.text_smaller": "Smaller text",
+  "menu.text_larger": "Larger text",
+  "menu.text_default": "Default text size"
 }

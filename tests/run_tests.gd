@@ -8,6 +8,8 @@ const ModeRules := preload("res://scripts/mode_rules.gd")
 const GameState := preload("res://scripts/game_state.gd")
 const QuizImport := preload("res://scripts/quiz_import.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd")
+const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
+const ReviewSchedulerScript := preload("res://scripts/review_scheduler.gd")
 
 var checks := 0
 var failures := 0
@@ -16,6 +18,7 @@ var failures := 0
 func _initialize() -> void:
 	_test_rules()
 	_test_modes()
+	_test_pet_avatar()
 	_test_question_bank()
 	_test_game_state()
 	_test_i18n()
@@ -24,6 +27,9 @@ func _initialize() -> void:
 	_test_custom_sets()
 	_test_leaderboard_persistence()
 	_test_mode_sessions()
+	_test_review_scheduler()
+	_test_text_scale()
+	_test_branding()
 	print("--------------------------------------------------")
 	print("%d checks, %d failure(s)" % [checks, failures])
 	quit(1 if failures > 0 else 0)
@@ -116,9 +122,10 @@ func _test_modes() -> void:
 	check(ModeRules.pet_outcome(0, 3) == "lost", "pet lost at exactly 3 wrong")
 	check(ModeRules.pet_outcome(19, 3) == "lost", "pet lost at 3 wrong even with 19 correct")
 	check(ModeRules.pet_outcome(20, 3) == "lost", "loss takes precedence over win")
-	check(ModeRules.PETS.size() == 4, "4 pets available")
+	check(ModeRules.PETS.size() == 5, "5 pets available")
 	check(ModeRules.is_valid_pet("cat") and ModeRules.is_valid_pet("fish"), "cat and fish are valid pets")
 	check(not ModeRules.is_valid_pet("dragon"), "dragon is not a pet")
+	check(ModeRules.is_valid_pet("hamster"), "hamster is a valid pet")
 
 	# Mode wiring in game_state.
 	var gs = GameState.new()
@@ -139,6 +146,22 @@ func _test_modes() -> void:
 	gs.save_data = backup
 	gs._write_save()
 	gs.free()
+
+
+# --------------------------------------------------------------- pet avatar
+
+func _test_pet_avatar() -> void:
+	print("[pet_avatar]")
+	var avatar = PetAvatarScript.new()
+	avatar.set_pet("dog")
+	check(avatar.pet_id == "dog", "dog avatar selected")
+	avatar.set_pet("dragon")
+	check(avatar.pet_id == "cat", "unknown pet falls back to cat")
+	avatar.set_progress(7, 20, 1, 3)
+	check(is_equal_approx(avatar.progress_ratio(), 0.35), "pet progress ratio")
+	avatar.set_progress(99, 20, 9, 3)
+	check(is_equal_approx(avatar.progress_ratio(), 1.0), "pet progress caps at 1.0")
+	avatar.free()
 
 
 # ------------------------------------------------------------ question bank
@@ -242,7 +265,7 @@ func _test_i18n() -> void:
 	var pt: Dictionary = gs._load_lang_file("pt-BR")
 	check(en.size() > 0, "en.json loads (%d keys)" % en.size())
 	check(pt.size() > 0, "pt-BR.json loads (%d keys)" % pt.size())
-	check(gs.LANGS.size() == 20, "20 languages defined (book reference list)")
+	check(gs.LANGS.size() == 19, "19 languages defined (book reference list)")
 
 	# Every language in LANGS must ship a complete, consistent file whose
 	# format placeholders (%d, %s, %.1f) appear in the same order as English,
@@ -429,3 +452,55 @@ func _test_mode_sessions() -> void:
 	check(ModeRules.pet_outcome(20, 0) == "saved", "the pet is saved at 20 correct")
 	check(ModeRules.pet_outcome(5, 3) == "lost", "the pet is lost at 3 wrong")
 	check(ModeRules.is_valid_pet("cat") and not ModeRules.is_valid_pet("dragon"), "pet validation")
+
+
+# ----------------------------------------------------------- review scheduler
+
+func _test_review_scheduler() -> void:
+	print("[review_scheduler]")
+	var rs = ReviewSchedulerScript.new()
+	var card = rs.new_card("fc-1", "1", 0)
+	check(int(card["box"]) == 1, "new card starts in box 1")
+	check(int(card["times_seen"]) == 0, "new card unseen")
+	check(rs.is_due(card, 0), "box 1 card is always due")
+	var promoted = rs.mark(card, true, 0)
+	check(int(promoted["box"]) == 2, "success promotes to box 2")
+	check(int(promoted["times_seen"]) == 1, "seen count increments")
+	check(not rs.is_due(promoted, 1), "box 2 not due after 1 day")
+	check(rs.is_due(promoted, 2), "box 2 due after 2 days")
+	var reset = rs.mark(promoted, false, 5)
+	check(int(reset["box"]) == 1, "failure resets to box 1")
+	check(rs.interval_for_box(1) == 0 and rs.interval_for_box(2) == 2 and rs.interval_for_box(3) == 5 and rs.interval_for_box(4) == 10, "box intervals 0/2/5/10")
+	var capped = rs.mark(rs.mark(rs.mark(rs.mark(card, true, 0), true, 0), true, 0), true, 0)
+	check(int(capped["box"]) == 4, "box caps at 4")
+	var cards = rs.ensure_cards_for_questions([], [{"id": "fc-a", "domain": "1"}, {"id": "fc-b", "domain": "2"}])
+	check(cards.size() == 2, "ensure builds a card per item")
+	check(rs.due_cards(cards, 0, "1").size() == 1, "due_cards filters by domain")
+	var gsf = GameState.new()
+	gsf._load_flashcards()
+	check(gsf.flashcards.size() == 186, "186 flashcards loaded from data")
+	check(rs.ensure_cards_for_questions([], gsf.flashcards).size() == 186, "a review card is built per flashcard")
+	gsf.free()
+
+# --------------------------------------------------------------- text scale
+
+func _test_text_scale() -> void:
+	print("[text_scale]")
+	check(GameState.stepped_scale(1.0, 0.15) > 1.0, "plus increases scale")
+	check(GameState.stepped_scale(1.0, -0.15) < 1.0, "minus decreases scale")
+	check(GameState.stepped_scale(GameState.TEXT_SCALE_MAX, 0.15) == GameState.TEXT_SCALE_MAX, "clamps at max")
+	check(GameState.stepped_scale(GameState.TEXT_SCALE_MIN, -0.15) == GameState.TEXT_SCALE_MIN, "clamps at min")
+
+# ------------------------------------------------------------------- branding
+
+func _test_branding() -> void:
+	print("[branding]")
+	check(String(ProjectSettings.get_setting("application/config/name", "")) == "Nimbus Cloud Boss Battle", "project name is the official title")
+	var gs = GameState.new()
+	var bad := 0
+	for l in gs.LANGS:
+		var d = gs._load_lang_file(String(l["code"]))
+		if String(d.get("menu.title", "")) != "NIMBUS CLOUD BOSS BATTLE":
+			bad += 1
+	check(bad == 0, "menu.title is the official name in all %d locales" % gs.LANGS.size())
+	gs.free()

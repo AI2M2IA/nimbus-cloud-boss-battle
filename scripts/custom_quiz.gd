@@ -61,7 +61,7 @@ func _ready() -> void:
 
 	var back := Button.new()
 	back.text = Game.t("battle.back")
-	back.add_theme_font_size_override("font_size", 16)
+	back.add_theme_font_size_override("font_size", UITheme.fs(16))
 	UITheme.style_button(back, UITheme.PANEL_LIGHT)
 	back.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
 	var back_row := HBoxContainer.new()
@@ -120,7 +120,7 @@ func _make_pool_row(set_id: String, set_name: String, count: int) -> HBoxContain
 	var use_btn := Button.new()
 	use_btn.text = Game.t("custom.in_use") if active else Game.t("custom.use")
 	use_btn.disabled = active
-	use_btn.add_theme_font_size_override("font_size", 13)
+	use_btn.add_theme_font_size_override("font_size", UITheme.fs(13))
 	UITheme.style_button(use_btn, UITheme.GOOD.darkened(0.4) if active else UITheme.PANEL_LIGHT)
 	var on_use := func() -> void:
 		Game.set_active_set(set_id)
@@ -131,7 +131,7 @@ func _make_pool_row(set_id: String, set_name: String, count: int) -> HBoxContain
 	if set_id != "":
 		var remove_btn := Button.new()
 		remove_btn.text = Game.t("custom.remove")
-		remove_btn.add_theme_font_size_override("font_size", 13)
+		remove_btn.add_theme_font_size_override("font_size", UITheme.fs(13))
 		UITheme.style_button(remove_btn, UITheme.BAD.darkened(0.45))
 		var on_remove := func() -> void:
 			Game.remove_custom_set(set_id)
@@ -169,7 +169,7 @@ func _make_import_panel() -> PanelContainer:
 
 	var load_btn := Button.new()
 	load_btn.text = Game.t("custom.load_file")
-	load_btn.add_theme_font_size_override("font_size", 14)
+	load_btn.add_theme_font_size_override("font_size", UITheme.fs(14))
 	UITheme.style_button(load_btn, UITheme.PANEL_LIGHT)
 	load_btn.pressed.connect(func() -> void: file_dialog.popup_centered_ratio(0.7))
 	name_row.add_child(load_btn)
@@ -182,7 +182,7 @@ func _make_import_panel() -> PanelContainer:
 
 	var import_btn := Button.new()
 	import_btn.text = Game.t("custom.import_btn")
-	import_btn.add_theme_font_size_override("font_size", 16)
+	import_btn.add_theme_font_size_override("font_size", UITheme.fs(16))
 	UITheme.style_button(import_btn, UITheme.ACCENT.darkened(0.3))
 	import_btn.pressed.connect(_on_import_pressed)
 	box.add_child(import_btn)
@@ -276,7 +276,7 @@ func _make_add_panel() -> PanelContainer:
 
 	var add_btn := Button.new()
 	add_btn.text = Game.t("custom.add_btn")
-	add_btn.add_theme_font_size_override("font_size", 16)
+	add_btn.add_theme_font_size_override("font_size", UITheme.fs(16))
 	UITheme.style_button(add_btn, UITheme.ACCENT.darkened(0.3))
 	add_btn.pressed.connect(_on_add_pressed)
 	box.add_child(add_btn)

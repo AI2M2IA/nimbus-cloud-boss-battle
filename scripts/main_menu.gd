@@ -3,6 +3,7 @@ extends Control
 ## All UI is built in code.
 
 const ModeRules := preload("res://scripts/mode_rules.gd")
+const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
 
 
 func _ready() -> void:
@@ -103,6 +104,39 @@ func _make_language_row() -> HBoxContainer:
 		get_tree().reload_current_scene()
 	picker.item_selected.connect(on_language_picked)
 	row.add_child(picker)
+
+	var minus := Button.new()
+	minus.text = "A\u2212"
+	minus.tooltip_text = Game.t("menu.text_smaller")
+	minus.add_theme_font_size_override("font_size", UITheme.fs(15))
+	UITheme.style_button(minus, UITheme.PANEL_LIGHT)
+	var on_smaller := func() -> void:
+		Game.adjust_text_scale(-Game.TEXT_SCALE_STEP)
+		get_tree().reload_current_scene()
+	minus.pressed.connect(on_smaller)
+	row.add_child(minus)
+
+	var reset := Button.new()
+	reset.text = "A"
+	reset.tooltip_text = Game.t("menu.text_default")
+	reset.add_theme_font_size_override("font_size", UITheme.fs(16))
+	UITheme.style_button(reset, UITheme.PANEL_LIGHT)
+	var on_reset := func() -> void:
+		Game.reset_text_scale()
+		get_tree().reload_current_scene()
+	reset.pressed.connect(on_reset)
+	row.add_child(reset)
+
+	var plus := Button.new()
+	plus.text = "A+"
+	plus.tooltip_text = Game.t("menu.text_larger")
+	plus.add_theme_font_size_override("font_size", UITheme.fs(18))
+	UITheme.style_button(plus, UITheme.PANEL_LIGHT)
+	var on_larger := func() -> void:
+		Game.adjust_text_scale(Game.TEXT_SCALE_STEP)
+		get_tree().reload_current_scene()
+	plus.pressed.connect(on_larger)
+	row.add_child(plus)
 	return row
 
 
@@ -114,17 +148,24 @@ func _make_extras_row() -> HBoxContainer:
 
 	var custom_btn := Button.new()
 	custom_btn.text = Game.t("menu.custom")
-	custom_btn.add_theme_font_size_override("font_size", 15)
+	custom_btn.add_theme_font_size_override("font_size", UITheme.fs(15))
 	UITheme.style_button(custom_btn, UITheme.PANEL_LIGHT)
 	custom_btn.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/custom_quiz.tscn"))
 	row.add_child(custom_btn)
 
 	var lb_btn := Button.new()
 	lb_btn.text = Game.t("menu.leaderboard")
-	lb_btn.add_theme_font_size_override("font_size", 15)
+	lb_btn.add_theme_font_size_override("font_size", UITheme.fs(15))
 	UITheme.style_button(lb_btn, UITheme.PANEL_LIGHT)
 	lb_btn.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/leaderboard.tscn"))
 	row.add_child(lb_btn)
+
+	var fc_btn := Button.new()
+	fc_btn.text = Game.t("menu.flashcards")
+	fc_btn.add_theme_font_size_override("font_size", UITheme.fs(15))
+	UITheme.style_button(fc_btn, UITheme.PANEL_LIGHT)
+	fc_btn.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/flashcards.tscn"))
+	row.add_child(fc_btn)
 	return row
 
 
@@ -168,7 +209,7 @@ func _make_card(battle: Dictionary) -> PanelContainer:
 
 	var fight := Button.new()
 	fight.text = Game.t("menu.fight")
-	fight.add_theme_font_size_override("font_size", 18)
+	fight.add_theme_font_size_override("font_size", UITheme.fs(18))
 	UITheme.style_button(fight, color.darkened(0.35))
 	fight.pressed.connect(_on_fight_pressed.bind(String(battle["id"])))
 	box.add_child(fight)
@@ -182,7 +223,7 @@ func _make_mode_card(mode: Dictionary) -> PanelContainer:
 	var card := PanelContainer.new()
 	card.add_theme_stylebox_override("panel", UITheme.panel_box(UITheme.PANEL, 14, 18))
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	card.custom_minimum_size = Vector2(340, 190)
+	card.custom_minimum_size = Vector2(340, 290 if id == "pet" else 190)
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
@@ -213,17 +254,29 @@ func _make_mode_card(mode: Dictionary) -> PanelContainer:
 		var pets := HBoxContainer.new()
 		pets.add_theme_constant_override("separation", 8)
 		for p in ModeRules.PETS:
+			var choice := VBoxContainer.new()
+			choice.add_theme_constant_override("separation", 4)
+			choice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+			var avatar = PetAvatarScript.new()
+			avatar.custom_minimum_size = Vector2(72, 64)
+			avatar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			avatar.set_pet(String(p))
+			choice.add_child(avatar)
+
 			var pet_btn := Button.new()
 			pet_btn.text = Game.t("pet.%s" % p)
 			pet_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			pet_btn.add_theme_font_size_override("font_size", UITheme.fs(14))
 			UITheme.style_button(pet_btn, color.darkened(0.35))
 			pet_btn.pressed.connect(_on_mode_pressed.bind(id, String(p)))
-			pets.add_child(pet_btn)
+			choice.add_child(pet_btn)
+			pets.add_child(choice)
 		box.add_child(pets)
 	else:
 		var start := Button.new()
 		start.text = Game.t("mode.start")
-		start.add_theme_font_size_override("font_size", 18)
+		start.add_theme_font_size_override("font_size", UITheme.fs(18))
 		UITheme.style_button(start, color.darkened(0.35))
 		start.pressed.connect(_on_mode_pressed.bind(id, Game.selected_pet))
 		box.add_child(start)

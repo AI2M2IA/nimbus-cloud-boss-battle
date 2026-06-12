@@ -8,6 +8,7 @@ extends Control
 
 const Rules := preload("res://scripts/battle_rules.gd")
 const ModeRules := preload("res://scripts/mode_rules.gd")
+const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
 
 var mode: Dictionary
 var mode_id: String = "survival"
@@ -40,6 +41,7 @@ var explain_panel: PanelContainer
 var verdict_label: Label
 var explain_text: RichTextLabel
 var continue_btn: Button
+var pet_avatar: PetAvatar
 
 
 func _ready() -> void:
@@ -100,6 +102,18 @@ func _build_ui() -> void:
 	xp_label = UITheme.label("", 14, UITheme.ACCENT)
 	status_box.add_child(xp_label)
 
+	if mode_id == "pet":
+		var pet_stage := CenterContainer.new()
+		pet_stage.custom_minimum_size = Vector2(0, 154)
+		pet_stage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		root.add_child(pet_stage)
+
+		pet_avatar = PetAvatarScript.new()
+		pet_avatar.custom_minimum_size = Vector2(260, 150)
+		pet_avatar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		pet_avatar.set_pet(pet)
+		pet_stage.add_child(pet_avatar)
+
 	# --- question card
 	var card := PanelContainer.new()
 	card.add_theme_stylebox_override("panel", UITheme.panel_box(UITheme.PANEL, 14, 20))
@@ -122,7 +136,7 @@ func _build_ui() -> void:
 	stem_text.fit_content = true
 	stem_text.scroll_active = false
 	stem_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	stem_text.add_theme_font_size_override("normal_font_size", 18)
+	stem_text.add_theme_font_size_override("normal_font_size", UITheme.fs(18))
 	stem_text.add_theme_color_override("default_color", UITheme.TEXT)
 	card_box.add_child(stem_text)
 
@@ -134,7 +148,7 @@ func _build_ui() -> void:
 	confirm_btn = Button.new()
 	confirm_btn.text = Game.t("battle.confirm")
 	confirm_btn.visible = false
-	confirm_btn.add_theme_font_size_override("font_size", 16)
+	confirm_btn.add_theme_font_size_override("font_size", UITheme.fs(16))
 	UITheme.style_button(confirm_btn, UITheme.ACCENT.darkened(0.3))
 	confirm_btn.pressed.connect(_on_confirm_pressed)
 	card_box.add_child(confirm_btn)
@@ -155,13 +169,13 @@ func _build_ui() -> void:
 	explain_text.fit_content = true
 	explain_text.scroll_active = false
 	explain_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	explain_text.add_theme_font_size_override("normal_font_size", 15)
+	explain_text.add_theme_font_size_override("normal_font_size", UITheme.fs(15))
 	explain_text.add_theme_color_override("default_color", UITheme.TEXT)
 	ex_box.add_child(explain_text)
 
 	continue_btn = Button.new()
 	continue_btn.text = Game.t("battle.continue")
-	continue_btn.add_theme_font_size_override("font_size", 16)
+	continue_btn.add_theme_font_size_override("font_size", UITheme.fs(16))
 	UITheme.style_button(continue_btn, UITheme.GOOD.darkened(0.4))
 	continue_btn.pressed.connect(_on_continue_pressed)
 	ex_box.add_child(continue_btn)
@@ -199,7 +213,7 @@ func _next_question() -> void:
 		var btn := Button.new()
 		btn.text = "%s)  %s" % [key, String(opt.get("text", ""))]
 		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		btn.add_theme_font_size_override("font_size", 16)
+		btn.add_theme_font_size_override("font_size", UITheme.fs(16))
 		btn.set("autowrap_mode", TextServer.AUTOWRAP_WORD_SMART)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		UITheme.style_button(btn, UITheme.PANEL_LIGHT)
@@ -269,6 +283,7 @@ func _evaluate(chosen: Array) -> void:
 		xp_earned += gained
 		verdict_label.text = Game.t("battle.hit") % [gained, Rules.multiplier(streak)]
 		verdict_label.add_theme_color_override("font_color", UITheme.GOOD)
+		_update_pet_reaction(true)
 	else:
 		wrong_count += 1
 		streak = 0
@@ -279,6 +294,7 @@ func _evaluate(chosen: Array) -> void:
 		else:
 			verdict_label.text = Game.t("run.wrong_strikes") % [wrong_count, ModeRules.SURVIVAL_MAX_WRONG]
 		verdict_label.add_theme_color_override("font_color", UITheme.BAD)
+		_update_pet_reaction(false)
 
 	if mode_id == "decay":
 		points = ModeRules.decay_points(points, correct)
@@ -324,6 +340,17 @@ func _update_hud() -> void:
 	status_label.text = _status_text()
 	streak_label.text = Game.t("battle.combo") % [streak, best_streak]
 	xp_label.text = Game.t("battle.xp") % xp_earned
+	if pet_avatar != null:
+		pet_avatar.set_progress(correct_count, ModeRules.PET_GOAL_CORRECT, wrong_count, ModeRules.PET_MAX_WRONG)
+
+
+func _update_pet_reaction(correct: bool) -> void:
+	if pet_avatar == null:
+		return
+	if correct:
+		pet_avatar.react_correct(correct_count, ModeRules.PET_GOAL_CORRECT)
+	else:
+		pet_avatar.react_wrong(wrong_count, ModeRules.PET_MAX_WRONG)
 
 
 func _status_text() -> String:
@@ -380,6 +407,15 @@ func _end_run(victory: bool) -> void:
 		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		box.add_child(sub)
 
+	if mode_id == "pet":
+		var final_avatar = PetAvatarScript.new()
+		final_avatar.custom_minimum_size = Vector2(210, 152)
+		final_avatar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		final_avatar.set_pet(pet)
+		final_avatar.set_progress(correct_count, ModeRules.PET_GOAL_CORRECT, wrong_count, ModeRules.PET_MAX_WRONG)
+		final_avatar.set_final_state(victory)
+		box.add_child(final_avatar)
+
 	box.add_child(UITheme.label(Game.t("run.final_score") % [correct_count, answered_count], 16))
 	box.add_child(UITheme.label(Game.t("battle.best_combo") % best_streak, 16))
 	box.add_child(UITheme.label(Game.t("battle.xp_earned") % xp_earned, 16, UITheme.ACCENT))
@@ -394,14 +430,14 @@ func _end_run(victory: bool) -> void:
 
 	var retry := Button.new()
 	retry.text = Game.t("run.retry")
-	retry.add_theme_font_size_override("font_size", 16)
+	retry.add_theme_font_size_override("font_size", UITheme.fs(16))
 	UITheme.style_button(retry, mode_color.darkened(0.35))
 	retry.pressed.connect(func() -> void: get_tree().reload_current_scene())
 	buttons.add_child(retry)
 
 	var menu := Button.new()
 	menu.text = Game.t("battle.back")
-	menu.add_theme_font_size_override("font_size", 16)
+	menu.add_theme_font_size_override("font_size", UITheme.fs(16))
 	UITheme.style_button(menu, UITheme.PANEL_LIGHT)
 	menu.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
 	buttons.add_child(menu)
@@ -451,7 +487,7 @@ func _make_score_row(score: int) -> VBoxContainer:
 
 	var save_btn := Button.new()
 	save_btn.text = Game.t("lb.save_score")
-	save_btn.add_theme_font_size_override("font_size", 14)
+	save_btn.add_theme_font_size_override("font_size", UITheme.fs(14))
 	UITheme.style_button(save_btn, UITheme.ACCENT.darkened(0.3))
 	var on_save := func() -> void:
 		Game.record_score(name_edit.text, mode_id, score)
