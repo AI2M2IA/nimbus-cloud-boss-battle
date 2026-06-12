@@ -9,6 +9,7 @@ const GameState := preload("res://scripts/game_state.gd")
 const QuizImport := preload("res://scripts/quiz_import.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd")
 const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
+const ReviewSchedulerScript := preload("res://scripts/review_scheduler.gd")
 
 var checks := 0
 var failures := 0
@@ -455,7 +456,7 @@ func _test_mode_sessions() -> void:
 
 func _test_review_scheduler() -> void:
 	print("[review_scheduler]")
-	var rs = ReviewScheduler.new()
+	var rs = ReviewSchedulerScript.new()
 	var card = rs.new_card("fc-1", "1", 0)
 	check(int(card["box"]) == 1, "new card starts in box 1")
 	check(int(card["times_seen"]) == 0, "new card unseen")
