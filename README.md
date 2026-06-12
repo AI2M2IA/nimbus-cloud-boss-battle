@@ -1,4 +1,4 @@
-# AWS Boss Battle
+# Nimbus Cloud Boss Battle
 
 A gamified version of the SAA-C03 practice exam ("simulado") from *Let's Learn AWS Together*, built with Godot 4. Each exam domain is a boss fight.
 

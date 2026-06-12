@@ -1,6 +1,6 @@
-# AWS Boss Battle Roadmap
+# Nimbus Cloud Boss Battle Roadmap
 
-This roadmap captures the parts of the reference archive that make sense for this repository, adapted to the current AWS Boss Battle architecture, license policy, identity policy, and American English artifact policy. It is intentionally incremental: keep the existing boss-battle flow, pure rules modules, and lightweight Godot setup.
+This roadmap captures the parts of the reference archive that make sense for this repository, adapted to the current Nimbus Cloud Boss Battle architecture, license policy, identity policy, and American English artifact policy. It is intentionally incremental: keep the existing boss-battle flow, pure rules modules, and lightweight Godot setup.
 
 ## Already Adapted
 
@@ -102,7 +102,7 @@ Acceptance criteria:
 The reference archive includes a badge-style icon and a cloud map illustration. Treat them as inspiration, not direct drop-in assets.
 
 Potential future direction:
-- Refresh the app icon while preserving the AWS Boss Battle identity.
+- Refresh the app icon while preserving the Nimbus Cloud Boss Battle identity.
 - Add a simple domain map or boss progression view covering D0, D1, D2, D3, D4, and the Final Gauntlet.
 - Keep visuals lightweight, readable, and consistent with the current dark arcade-study interface.
 

@@ -1,6 +1,6 @@
 # Release Checklist
 
-Use this checklist before creating a release commit, tag, source archive, or Godot export for AWS Boss Battle.
+Use this checklist before creating a release commit, tag, source archive, or Godot export for Nimbus Cloud Boss Battle.
 
 ## Identity
 

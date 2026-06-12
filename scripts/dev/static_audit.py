@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local release-surface audit for AWS Boss Battle."""
+"""Local release-surface audit for Nimbus Cloud Boss Battle."""
 
 from __future__ import annotations
 
@@ -169,7 +169,7 @@ LICENSE_REQUIRED_FRAGMENTS = (
     ("AGPL-3.0 Section 7(b)", "AGPL-3.0 Section 7(b)"),
     ("AGPL-3.0 Section 7(c)", "AGPL-3.0 Section 7(c)"),
     ("AI(2)M(2)IA attribution", "AI(2)M(2)IA"),
-    ("original source repository", "https://github.com/AI2M2IA/aws-game"),
+    ("original source repository", "https://github.com/AI2M2IA/nimbus-cloud-boss-battle"),
 )
 
 
@@ -456,7 +456,7 @@ def print_results(findings: list[Finding], scanned_count: int) -> None:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Audit the AWS Boss Battle release surface for risky local artifacts."
+        description="Audit the Nimbus Cloud Boss Battle release surface for risky local artifacts."
     )
     parser.add_argument(
         "--root",
