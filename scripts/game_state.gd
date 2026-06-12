@@ -7,6 +7,7 @@ const Leaderboard := preload("res://scripts/leaderboard.gd")
 
 const QUESTIONS_PATH := "res://data/questions.json"
 const SAVE_PATH := "user://save.json"
+const FLASHCARDS_PATH := "res://data/flashcards.json"
 const CUSTOM_SETS_PATH := "user://custom_sets.json"
 const LEADERBOARD_PATH := "user://leaderboard.json"
 
@@ -107,6 +108,7 @@ const LANGS := [
 ]
 
 var questions: Array = []
+var flashcards: Array = []
 var save_data: Dictionary = {"xp": 0, "battles": {}}
 var selected_battle_id: String = "d0"
 var selected_mode: String = "survival"
@@ -122,6 +124,7 @@ var _fallback: Dictionary = {}
 
 func _ready() -> void:
 	_load_questions()
+	_load_flashcards()
 	_load_save()
 	_load_custom_sets()
 	_load_leaderboard()
@@ -420,3 +423,21 @@ func _load_save() -> void:
 	var data = JSON.parse_string(f.get_as_text())
 	if typeof(data) == TYPE_DICTIONARY:
 		save_data = data
+
+func _load_flashcards() -> void:
+	var f := FileAccess.open(FLASHCARDS_PATH, FileAccess.READ)
+	if f == null:
+		return
+	var data = JSON.parse_string(f.get_as_text())
+	if typeof(data) == TYPE_DICTIONARY and data.has("flashcards"):
+		flashcards = data["flashcards"]
+
+func review_cards() -> Array:
+	return save_data.get("review_cards", [])
+
+func save_review_cards(cards: Array) -> void:
+	save_data["review_cards"] = cards
+	_write_save()
+
+func today_day() -> int:
+	return int(Time.get_unix_time_from_system() / 86400.0)

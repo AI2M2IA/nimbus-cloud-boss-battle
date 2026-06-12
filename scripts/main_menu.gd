@@ -126,6 +126,13 @@ func _make_extras_row() -> HBoxContainer:
 	UITheme.style_button(lb_btn, UITheme.PANEL_LIGHT)
 	lb_btn.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/leaderboard.tscn"))
 	row.add_child(lb_btn)
+
+	var fc_btn := Button.new()
+	fc_btn.text = Game.t("menu.flashcards")
+	fc_btn.add_theme_font_size_override("font_size", 15)
+	UITheme.style_button(fc_btn, UITheme.PANEL_LIGHT)
+	fc_btn.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/flashcards.tscn"))
+	row.add_child(fc_btn)
 	return row
 
 

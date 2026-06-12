@@ -99,5 +99,14 @@
   "lb.record_score": "คะแนนกระดานผู้นำ: %d",
   "lb.your_name": "ชื่อของคุณ",
   "lb.save_score": "บันทึกคะแนน",
-  "lb.saved": "บันทึกลงกระดานผู้นำแล้ว!"
+  "lb.saved": "บันทึกลงกระดานผู้นำแล้ว!",
+  "menu.flashcards": "Flashcards",
+  "flashcards.title": "Flashcards (Leitner)",
+  "flashcards.cards": "Cards",
+  "flashcards.flip_hint": "Click the card to flip",
+  "flashcards.grade_hint": "Did you know it?",
+  "flashcards.got_it": "Got it",
+  "flashcards.again": "Again",
+  "flashcards.complete": "All caught up — come back tomorrow!",
+  "flashcards.back": "Back to menu"
 }

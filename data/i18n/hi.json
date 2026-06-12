@@ -99,5 +99,14 @@
   "lb.record_score": "लीडरबोर्ड स्कोर: %d",
   "lb.your_name": "आपका नाम",
   "lb.save_score": "स्कोर सहेजें",
-  "lb.saved": "लीडरबोर्ड में सहेजा गया!"
+  "lb.saved": "लीडरबोर्ड में सहेजा गया!",
+  "menu.flashcards": "Flashcards",
+  "flashcards.title": "Flashcards (Leitner)",
+  "flashcards.cards": "Cards",
+  "flashcards.flip_hint": "Click the card to flip",
+  "flashcards.grade_hint": "Did you know it?",
+  "flashcards.got_it": "Got it",
+  "flashcards.again": "Again",
+  "flashcards.complete": "All caught up — come back tomorrow!",
+  "flashcards.back": "Back to menu"
 }

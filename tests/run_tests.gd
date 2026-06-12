@@ -474,3 +474,8 @@ func _test_review_scheduler() -> void:
 	var cards = rs.ensure_cards_for_questions([], [{"id": "fc-a", "domain": "1"}, {"id": "fc-b", "domain": "2"}])
 	check(cards.size() == 2, "ensure builds a card per item")
 	check(rs.due_cards(cards, 0, "1").size() == 1, "due_cards filters by domain")
+	var gsf = GameState.new()
+	gsf._load_flashcards()
+	check(gsf.flashcards.size() == 186, "186 flashcards loaded from data")
+	check(rs.ensure_cards_for_questions([], gsf.flashcards).size() == 186, "a review card is built per flashcard")
+	gsf.free()

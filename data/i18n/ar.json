@@ -99,5 +99,14 @@
   "lb.record_score": "نتيجة لوحة الصدارة: %d",
   "lb.your_name": "اسمك",
   "lb.save_score": "احفظ النتيجة",
-  "lb.saved": "حُفظت في لوحة الصدارة!"
+  "lb.saved": "حُفظت في لوحة الصدارة!",
+  "menu.flashcards": "Flashcards",
+  "flashcards.title": "Flashcards (Leitner)",
+  "flashcards.cards": "Cards",
+  "flashcards.flip_hint": "Click the card to flip",
+  "flashcards.grade_hint": "Did you know it?",
+  "flashcards.got_it": "Got it",
+  "flashcards.again": "Again",
+  "flashcards.complete": "All caught up — come back tomorrow!",
+  "flashcards.back": "Back to menu"
 }

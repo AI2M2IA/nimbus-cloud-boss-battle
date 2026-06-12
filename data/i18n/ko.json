@@ -99,5 +99,14 @@
   "lb.record_score": "리더보드 점수: %d",
   "lb.your_name": "이름",
   "lb.save_score": "점수 저장",
-  "lb.saved": "리더보드에 저장했습니다!"
+  "lb.saved": "리더보드에 저장했습니다!",
+  "menu.flashcards": "Flashcards",
+  "flashcards.title": "Flashcards (Leitner)",
+  "flashcards.cards": "Cards",
+  "flashcards.flip_hint": "Click the card to flip",
+  "flashcards.grade_hint": "Did you know it?",
+  "flashcards.got_it": "Got it",
+  "flashcards.again": "Again",
+  "flashcards.complete": "All caught up — come back tomorrow!",
+  "flashcards.back": "Back to menu"
 }

@@ -99,5 +99,14 @@
   "lb.record_score": "排行榜得分：%d",
   "lb.your_name": "你的名字",
   "lb.save_score": "保存分数",
-  "lb.saved": "已保存到排行榜！"
+  "lb.saved": "已保存到排行榜！",
+  "menu.flashcards": "Flashcards",
+  "flashcards.title": "Flashcards (Leitner)",
+  "flashcards.cards": "Cards",
+  "flashcards.flip_hint": "Click the card to flip",
+  "flashcards.grade_hint": "Did you know it?",
+  "flashcards.got_it": "Got it",
+  "flashcards.again": "Again",
+  "flashcards.complete": "All caught up — come back tomorrow!",
+  "flashcards.back": "Back to menu"
 }

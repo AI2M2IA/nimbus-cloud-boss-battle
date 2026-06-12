@@ -12,7 +12,6 @@
   "menu.modes_title": "MODOS DE JOGO",
   "menu.modes_hint": "O mesmo banco de perguntas, três jeitos diferentes de suar.",
   "menu.mode_record": "Melhor placar: %d   |   %d tentativas",
-
   "mode.survival.name": "Sobrevivência",
   "mode.survival.desc": "Três respostas erradas encerram a partida. Sem regeneração de corações. Até onde você vai?",
   "mode.decay.name": "Pontos em Queda",
@@ -21,13 +20,11 @@
   "mode.pet.desc": "Acerte 20 perguntas para salvar seu pet. Três erros e é fim de jogo.",
   "mode.start": "COMEÇAR",
   "mode.pet.pick": "Escolha seu pet:",
-
   "pet.cat": "Gato",
   "pet.dog": "Cachorro",
   "pet.parrot": "Papagaio",
   "pet.fish": "Peixe",
   "pet.hamster": "Hamster",
-
   "battle.you": "VOCÊ",
   "battle.confirm": "CONFIRMAR (escolha 2)",
   "battle.continue": "CONTINUAR",
@@ -53,7 +50,6 @@
   "battle.retreat": "Recuar para o menu",
   "battle.retry": "LUTAR DE NOVO",
   "battle.back": "VOLTAR AO MENU",
-
   "run.mistakes_left": "Erros restantes: %d",
   "run.points": "Pontos: %d",
   "run.pet_progress": "Resgate do %s: %d / %d acertos",
@@ -69,11 +65,9 @@
   "run.pet_lost": "Seu %s precisava de 20 acertos. Estude e tente de novo!",
   "run.final_score": "Placar final: %d acertos em %d respondidas",
   "run.retry": "JOGAR DE NOVO",
-
   "menu.custom": "QUIZ PERSONALIZADO",
   "menu.leaderboard": "RANKING",
   "menu.active_set": "Modos de jogo usam: %s",
-
   "custom.title": "QUIZ PERSONALIZADO",
   "custom.subtitle": "Monte seus próprios conjuntos de perguntas ou importe o JSON exportado do site do livro. Os modos de jogo usam o conjunto ativo; as batalhas de chefe sempre usam o banco original.",
   "custom.active_pool": "BANCO DE PERGUNTAS",
@@ -98,7 +92,6 @@
   "custom.explanation": "Explicação",
   "custom.add_btn": "ADICIONAR PERGUNTA",
   "custom.added_ok": "Adicionada! '%s' agora tem %d pergunta(s).",
-
   "lb.title": "RANKING",
   "lb.subtitle": "Melhores partidas locais por modo — salvas apenas neste dispositivo.",
   "lb.boss": "Batalhas de Chefe",
@@ -106,5 +99,14 @@
   "lb.record_score": "Pontuação para o ranking: %d",
   "lb.your_name": "Seu nome",
   "lb.save_score": "SALVAR PLACAR",
-  "lb.saved": "Salvo no ranking!"
+  "lb.saved": "Salvo no ranking!",
+  "menu.flashcards": "Flashcards",
+  "flashcards.title": "Flashcards (Leitner)",
+  "flashcards.cards": "Cartões",
+  "flashcards.flip_hint": "Clique no cartão para virar",
+  "flashcards.grade_hint": "Você sabia?",
+  "flashcards.got_it": "Acertei",
+  "flashcards.again": "De novo",
+  "flashcards.complete": "Tudo em dia — volte amanhã!",
+  "flashcards.back": "Voltar ao menu"
 }

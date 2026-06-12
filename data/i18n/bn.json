@@ -99,5 +99,14 @@
   "lb.record_score": "লিডারবোর্ড স্কোর: %d",
   "lb.your_name": "আপনার নাম",
   "lb.save_score": "স্কোর সংরক্ষণ",
-  "lb.saved": "লিডারবোর্ডে সংরক্ষিত!"
+  "lb.saved": "লিডারবোর্ডে সংরক্ষিত!",
+  "menu.flashcards": "Flashcards",
+  "flashcards.title": "Flashcards (Leitner)",
+  "flashcards.cards": "Cards",
+  "flashcards.flip_hint": "Click the card to flip",
+  "flashcards.grade_hint": "Did you know it?",
+  "flashcards.got_it": "Got it",
+  "flashcards.again": "Again",
+  "flashcards.complete": "All caught up — come back tomorrow!",
+  "flashcards.back": "Back to menu"
 }

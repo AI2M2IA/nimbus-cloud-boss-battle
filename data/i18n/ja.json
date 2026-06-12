@@ -99,5 +99,14 @@
   "lb.record_score": "ランキングスコア: %d",
   "lb.your_name": "あなたの名前",
   "lb.save_score": "スコアを保存",
-  "lb.saved": "ランキングに保存しました！"
+  "lb.saved": "ランキングに保存しました！",
+  "menu.flashcards": "Flashcards",
+  "flashcards.title": "Flashcards (Leitner)",
+  "flashcards.cards": "Cards",
+  "flashcards.flip_hint": "Click the card to flip",
+  "flashcards.grade_hint": "Did you know it?",
+  "flashcards.got_it": "Got it",
+  "flashcards.again": "Again",
+  "flashcards.complete": "All caught up — come back tomorrow!",
+  "flashcards.back": "Back to menu"
 }
