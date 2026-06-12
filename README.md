@@ -1,6 +1,6 @@
 # Nimbus Cloud Boss Battle
 
-A gamified version of the SAA-C03 practice exam ("simulado") from *Let's Learn AWS Together*, built with Godot 4. Each exam domain is a boss fight.
+A gamified version of the SAA-C03 practice exam from *Let's Learn AWS Together*, built with Godot 4. Each exam domain is a boss fight.
 
 ## How it plays
 
@@ -69,7 +69,7 @@ You can also pass raw Godot arguments through the shortcut, for example `./godot
 
 ## Updating the questions
 
-`data/questions.json` is a copy of `docs/api/questions.json` from the book site. To sync after editing the book's simulado, just copy the file over again — the game reads it at startup, nothing else to change.
+`data/questions.json` is a copy of `docs/api/questions.json` from the book site. To sync after editing the book's practice exam, just copy the file over again — the game reads it at startup, nothing else to change.
 
 ## Project layout
 
