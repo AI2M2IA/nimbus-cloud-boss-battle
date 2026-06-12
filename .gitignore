@@ -16,6 +16,13 @@ export_presets.cfg
 Thumbs.db
 *.tmp
 
+# Python cache from local development checks
+__pycache__/
+*.pyc
+*.pyo
+
 # Player save data should never be committed
 *.save
 user://
+user-data/
+*.log

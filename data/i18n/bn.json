@@ -1,5 +1,5 @@
 {
-  "menu.title": "AWS BOSS BATTLE",
+  "menu.title": "NIMBUS CLOUD BOSS BATTLE",
   "menu.subtitle": "SAA-C03 অনুশীলন পরীক্ষা, গেম আকারে। প্রতিটি ডোমেইন বসকে হারান।",
   "menu.xp_rank": "XP: %d   -   র‍্যাঙ্ক: %s",
   "menu.language": "ভাষা",
@@ -24,6 +24,7 @@
   "pet.dog": "কুকুর",
   "pet.parrot": "টিয়া",
   "pet.fish": "মাছ",
+  "pet.hamster": "হ্যামস্টার",
   "battle.you": "আপনি",
   "battle.confirm": "নিশ্চিত করুন (২টি বাছুন)",
   "battle.continue": "চালিয়ে যান",
@@ -98,5 +99,17 @@
   "lb.record_score": "লিডারবোর্ড স্কোর: %d",
   "lb.your_name": "আপনার নাম",
   "lb.save_score": "স্কোর সংরক্ষণ",
-  "lb.saved": "লিডারবোর্ডে সংরক্ষিত!"
+  "lb.saved": "লিডারবোর্ডে সংরক্ষিত!",
+  "menu.flashcards": "Flashcards",
+  "flashcards.title": "Flashcards (Leitner)",
+  "flashcards.cards": "Cards",
+  "flashcards.flip_hint": "Click the card to flip",
+  "flashcards.grade_hint": "Did you know it?",
+  "flashcards.got_it": "Got it",
+  "flashcards.again": "Again",
+  "flashcards.complete": "All caught up — come back tomorrow!",
+  "flashcards.back": "Back to menu",
+  "menu.text_smaller": "Smaller text",
+  "menu.text_larger": "Larger text",
+  "menu.text_default": "Default text size"
 }

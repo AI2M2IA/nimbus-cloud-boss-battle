@@ -1,5 +1,5 @@
 {
-  "menu.title": "AWS BOSS BATTLE",
+  "menu.title": "NIMBUS CLOUD BOSS BATTLE",
   "menu.subtitle": "SAA-C03 practice exam, gamified. Defeat every domain boss.",
   "menu.xp_rank": "XP: %d   -   Rank: %s",
   "menu.language": "Language",
@@ -12,7 +12,6 @@
   "menu.modes_title": "GAME MODES",
   "menu.modes_hint": "Same question pool, three different ways to sweat.",
   "menu.mode_record": "Best score: %d   |   %d attempts",
-
   "mode.survival.name": "Survival",
   "mode.survival.desc": "Three wrong answers end the run. No heart regen. How far can you go?",
   "mode.decay.name": "Points Decay",
@@ -21,12 +20,11 @@
   "mode.pet.desc": "Answer 20 questions correctly to save your pet. Three wrong answers and it is game over.",
   "mode.start": "START",
   "mode.pet.pick": "Pick your pet:",
-
   "pet.cat": "Cat",
   "pet.dog": "Dog",
   "pet.parrot": "Parrot",
   "pet.fish": "Fish",
-
+  "pet.hamster": "Hamster",
   "battle.you": "YOU",
   "battle.confirm": "CONFIRM (pick 2)",
   "battle.continue": "CONTINUE",
@@ -52,7 +50,6 @@
   "battle.retreat": "Retreat to menu",
   "battle.retry": "FIGHT AGAIN",
   "battle.back": "BACK TO MENU",
-
   "run.mistakes_left": "Mistakes left: %d",
   "run.points": "Points: %d",
   "run.pet_progress": "%s rescue: %d / %d correct",
@@ -68,11 +65,9 @@
   "run.pet_lost": "Your %s needed 20 correct answers. Study and try again!",
   "run.final_score": "Final score: %d correct out of %d answered",
   "run.retry": "RUN AGAIN",
-
   "menu.custom": "CUSTOM QUIZ",
   "menu.leaderboard": "LEADERBOARD",
   "menu.active_set": "Game modes draw from: %s",
-
   "custom.title": "CUSTOM QUIZ",
   "custom.subtitle": "Build your own question sets or import the book site's exported JSON. Game modes draw from the active set; boss battles always use the built-in bank.",
   "custom.active_pool": "QUESTION POOL",
@@ -97,7 +92,6 @@
   "custom.explanation": "Explanation",
   "custom.add_btn": "ADD QUESTION",
   "custom.added_ok": "Added! '%s' now has %d question(s).",
-
   "lb.title": "LEADERBOARD",
   "lb.subtitle": "Top local runs per mode — stored only on this device.",
   "lb.boss": "Boss Battles",
@@ -105,5 +99,17 @@
   "lb.record_score": "Leaderboard score: %d",
   "lb.your_name": "Your name",
   "lb.save_score": "SAVE SCORE",
-  "lb.saved": "Saved to the leaderboard!"
+  "lb.saved": "Saved to the leaderboard!",
+  "menu.flashcards": "Flashcards",
+  "flashcards.title": "Flashcards (Leitner)",
+  "flashcards.cards": "Cards",
+  "flashcards.flip_hint": "Click the card to flip",
+  "flashcards.grade_hint": "Did you know it?",
+  "flashcards.got_it": "Got it",
+  "flashcards.again": "Again",
+  "flashcards.complete": "All caught up — come back tomorrow!",
+  "flashcards.back": "Back to menu",
+  "menu.text_smaller": "Smaller text",
+  "menu.text_larger": "Larger text",
+  "menu.text_default": "Default text size"
 }

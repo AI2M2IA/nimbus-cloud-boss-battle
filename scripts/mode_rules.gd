@@ -18,7 +18,7 @@ const DECAY_CORRECT_REWARD := 50
 
 const PET_MAX_WRONG := 3
 const PET_GOAL_CORRECT := 20
-const PETS := ["cat", "dog", "parrot", "fish"]
+const PETS := ["cat", "dog", "parrot", "fish", "hamster"]
 
 
 ## Survival: the run is over once `wrong` reaches SURVIVAL_MAX_WRONG.
