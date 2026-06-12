@@ -110,5 +110,6 @@
   "flashcards.complete": "All caught up — come back tomorrow!",
   "flashcards.back": "Back to menu",
   "menu.text_smaller": "Smaller text",
-  "menu.text_larger": "Larger text"
+  "menu.text_larger": "Larger text",
+  "menu.text_default": "Default text size"
 }

@@ -110,5 +110,6 @@
   "flashcards.complete": "¡Todo al día, vuelve mañana!",
   "flashcards.back": "Volver al menú",
   "menu.text_smaller": "Texto más pequeño",
-  "menu.text_larger": "Texto más grande"
+  "menu.text_larger": "Texto más grande",
+  "menu.text_default": "Tamaño normal"
 }

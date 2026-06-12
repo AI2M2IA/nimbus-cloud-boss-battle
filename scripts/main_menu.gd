@@ -116,6 +116,17 @@ func _make_language_row() -> HBoxContainer:
 	minus.pressed.connect(on_smaller)
 	row.add_child(minus)
 
+	var reset := Button.new()
+	reset.text = "A"
+	reset.tooltip_text = Game.t("menu.text_default")
+	reset.add_theme_font_size_override("font_size", UITheme.fs(16))
+	UITheme.style_button(reset, UITheme.PANEL_LIGHT)
+	var on_reset := func() -> void:
+		Game.reset_text_scale()
+		get_tree().reload_current_scene()
+	reset.pressed.connect(on_reset)
+	row.add_child(reset)
+
 	var plus := Button.new()
 	plus.text = "A+"
 	plus.tooltip_text = Game.t("menu.text_larger")

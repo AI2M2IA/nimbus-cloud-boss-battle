@@ -455,3 +455,8 @@ func adjust_text_scale(delta: float) -> float:
 	save_data["text_scale"] = text_scale
 	_write_save()
 	return text_scale
+
+func reset_text_scale() -> void:
+	text_scale = 1.0
+	save_data["text_scale"] = 1.0
+	_write_save()
