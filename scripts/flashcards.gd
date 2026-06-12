@@ -10,6 +10,7 @@ var _by_id: Dictionary = {}
 var _queue: Array = []
 var _pos: int = 0
 var _flipped: bool = false
+var _animating: bool = false
 
 var _card_btn: Button
 var _hint: Label
@@ -92,7 +93,7 @@ func _build_ui() -> void:
 	col.add_child(back)
 
 
-func _show_current() -> void:
+func _show_current(animate: bool = false) -> void:
 	if _pos >= _queue.size():
 		_card_btn.text = Game.t("flashcards.complete")
 		_hint.text = ""
@@ -101,26 +102,40 @@ func _show_current() -> void:
 		return
 	var fc: Dictionary = _by_id.get(String(_queue[_pos]), {})
 	_flipped = false
-	_card_btn.text = String(fc.get("term", String(_queue[_pos])))
 	_hint.text = Game.t("flashcards.flip_hint")
 	_again_btn.disabled = true
 	_got_btn.disabled = true
 	_progress.text = "%s  %d / %d" % [Game.t("flashcards.cards"), _pos + 1, _queue.size()]
+	var term := String(fc.get("term", String(_queue[_pos])))
+	if animate:
+		_flip_card(term)
+	else:
+		_card_btn.text = term
 
 
 func _on_card_pressed() -> void:
-	if _pos >= _queue.size() or _flipped:
+	if _animating or _pos >= _queue.size() or _flipped:
 		return
 	var fc: Dictionary = _by_id.get(String(_queue[_pos]), {})
-	_card_btn.text = String(fc.get("definition", ""))
-	_hint.text = Game.t("flashcards.grade_hint")
 	_flipped = true
+	_hint.text = Game.t("flashcards.grade_hint")
 	_again_btn.disabled = false
 	_got_btn.disabled = false
+	_flip_card(String(fc.get("definition", "")))
+
+
+func _flip_card(new_text: String) -> void:
+	_animating = true
+	_card_btn.pivot_offset = _card_btn.size * 0.5
+	var tw := create_tween()
+	tw.tween_property(_card_btn, "scale:x", 0.0, 0.11).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func() -> void: _card_btn.text = new_text)
+	tw.tween_property(_card_btn, "scale:x", 1.0, 0.11).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func() -> void: _animating = false)
 
 
 func _on_grade(success: bool) -> void:
-	if not _flipped or _pos >= _queue.size():
+	if _animating or not _flipped or _pos >= _queue.size():
 		return
 	var fc_id := String(_queue[_pos])
 	for i in range(_cards.size()):
@@ -129,7 +144,7 @@ func _on_grade(success: bool) -> void:
 			break
 	Game.save_review_cards(_cards)
 	_pos += 1
-	_show_current()
+	_show_current(true)
 
 
 func _on_back() -> void:
