@@ -8,7 +8,6 @@ const ModeRules := preload("res://scripts/mode_rules.gd")
 const GameState := preload("res://scripts/game_state.gd")
 const QuizImport := preload("res://scripts/quiz_import.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd")
-const ReviewScheduler := preload("res://scripts/review_scheduler.gd")
 const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
 
 var checks := 0
@@ -263,7 +262,7 @@ func _test_i18n() -> void:
 	var pt: Dictionary = gs._load_lang_file("pt-BR")
 	check(en.size() > 0, "en.json loads (%d keys)" % en.size())
 	check(pt.size() > 0, "pt-BR.json loads (%d keys)" % pt.size())
-	check(gs.LANGS.size() == 20, "20 languages defined (book reference list)")
+	check(gs.LANGS.size() == 19, "19 languages defined (book reference list)")
 
 	# Every language in LANGS must ship a complete, consistent file whose
 	# format placeholders (%d, %s, %.1f) appear in the same order as English,

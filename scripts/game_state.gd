@@ -99,7 +99,6 @@ const LANGS := [
 	{"code": "de", "name": "Deutsch"},
 	{"code": "ja", "name": "日本語"},
 	{"code": "sw", "name": "Kiswahili"},
-	{"code": "it", "name": "Italiano"},
 	{"code": "tr", "name": "Türkçe"},
 	{"code": "vi", "name": "Tiếng Việt"},
 	{"code": "ko", "name": "한국어"},
