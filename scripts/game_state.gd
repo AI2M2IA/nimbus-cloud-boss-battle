@@ -133,7 +133,7 @@ func _ready() -> void:
 	_load_custom_sets()
 	_load_leaderboard()
 	_fallback = _load_lang_file("en")
-	text_scale = float(save_data.get("text_scale", 1.0))
+	text_scale = clampf(float(save_data.get("text_scale", 1.0)), TEXT_SCALE_MIN, TEXT_SCALE_MAX)
 	lang = String(save_data.get("lang", "en"))
 	_strings = _fallback if lang == "en" else _load_lang_file(lang)
 
@@ -305,7 +305,31 @@ func _load_custom_sets() -> void:
 		return
 	var data = JSON.parse_string(f.get_as_text())
 	if typeof(data) == TYPE_DICTIONARY and typeof(data.get("sets")) == TYPE_ARRAY:
-		custom_sets = data["sets"]
+		custom_sets = _sanitize_custom_sets(data["sets"])
+
+
+## Defense in depth: custom_sets.json is editable (on web it lives in browser
+## storage), so every set is revalidated on load through the import schema and
+## dropped if its questions no longer pass, instead of trusting the file.
+func _sanitize_custom_sets(raw: Array) -> Array:
+	var clean: Array = []
+	var seen := {}
+	for item in raw:
+		if typeof(item) != TYPE_DICTIONARY:
+			continue
+		var sid := String((item as Dictionary).get("id", "")).strip_edges()
+		var qs = (item as Dictionary).get("questions", [])
+		if sid == "" or seen.has(sid) or typeof(qs) != TYPE_ARRAY:
+			continue
+		if not QuizImport.validate_bank({"questions": qs})["ok"]:
+			continue
+		seen[sid] = true
+		clean.append({
+			"id": sid,
+			"name": String((item as Dictionary).get("name", "")).strip_edges(),
+			"questions": qs,
+		})
+	return clean
 
 
 # ---------------------------------------------------------------- leaderboard
@@ -438,7 +462,8 @@ func _load_flashcards() -> void:
 		flashcards = data["flashcards"]
 
 func review_cards() -> Array:
-	return save_data.get("review_cards", [])
+	var rc = save_data.get("review_cards", [])
+	return rc if typeof(rc) == TYPE_ARRAY else []
 
 func save_review_cards(cards: Array) -> void:
 	save_data["review_cards"] = cards

@@ -362,6 +362,25 @@ func _test_quiz_import() -> void:
 	check(bq["options"].size() == 4 and bq["options"][2]["key"] == "C", "build_question maps texts to A-D")
 	check(QuizImport.build_question("c2", "s", ["a", "b", "c", "d"], ["A", "C"], "e", 2)["type"] == "select_two", "two answers make a select_two")
 	check(QuizImport.validate_bank({"questions": [bq]})["ok"], "a built question validates")
+	check(QuizImport.has_unsafe_chars(char(0x07)), "a control char is unsafe")
+	check(QuizImport.has_unsafe_chars("a" + char(0x202E) + "b"), "a bidi override is unsafe")
+	check(not QuizImport.has_unsafe_chars("plain text 123"), "plain text is safe")
+	var over: Array = []
+	for _i in range(QuizImport.MAX_QUESTIONS + 1):
+		over.append(good)
+	check(not QuizImport.validate_bank({"questions": over})["ok"], "an over-limit bank fails")
+	var longq: Dictionary = good.duplicate(true)
+	longq["id"] = "long1"
+	longq["stem"] = "x".repeat(QuizImport.MAX_TEXT_LEN + 1)
+	check(not QuizImport.validate_bank({"questions": [longq]})["ok"], "an over-long stem fails")
+	var ctrlq: Dictionary = good.duplicate(true)
+	ctrlq["id"] = "ctrl1"
+	ctrlq["stem"] = "bad" + char(0x202E) + "stem"
+	check(not QuizImport.validate_bank({"questions": [ctrlq]})["ok"], "a stem with a bidi override fails")
+	var domq: Dictionary = good.duplicate(true)
+	domq["id"] = "dom1"
+	domq["domain"] = 99999
+	check(not QuizImport.validate_bank({"questions": [domq]})["ok"], "an out-of-range domain fails")
 
 
 # ---------------------------------------------------------------- leaderboard
@@ -408,6 +427,11 @@ func _test_custom_sets() -> void:
 	check(gs.active_set_id() == id, "the active set is tracked")
 	gs.remove_custom_set(id)
 	check(gs.list_custom_sets().is_empty(), "remove_custom_set clears the set")
+	check(gs._sanitize_custom_sets([42, {"id": "", "name": "n", "questions": []}]).is_empty(), "load drops malformed and empty-id sets")
+	var keepq := QuizImport.build_question("k1", "stem", ["a", "b", "c", "d"], ["A"], "exp", 1)
+	var kept := gs._sanitize_custom_sets([{"id": "keep", "name": "Keep", "questions": [keepq]}])
+	check(kept.size() == 1 and kept[0]["id"] == "keep", "load keeps a set whose questions validate")
+	check(gs._sanitize_custom_sets([{"id": "bad", "name": "Bad", "questions": [{"id": "x"}]}]).is_empty(), "load drops a set with invalid questions")
 	gs.free()
 	_restore_file(GameState.CUSTOM_SETS_PATH, snap_sets)
 	_restore_file(GameState.SAVE_PATH, snap_save)
