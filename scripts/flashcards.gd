@@ -11,6 +11,7 @@ var _queue: Array = []
 var _pos: int = 0
 var _flipped: bool = false
 var _animating: bool = false
+var _revealed: bool = false
 
 var _card_btn: Button
 var _hint: Label
@@ -102,6 +103,7 @@ func _show_current(animate: bool = false) -> void:
 		return
 	var fc: Dictionary = _by_id.get(String(_queue[_pos]), {})
 	_flipped = false
+	_revealed = false
 	_hint.text = Game.t("flashcards.flip_hint")
 	_again_btn.disabled = true
 	_got_btn.disabled = true
@@ -114,14 +116,19 @@ func _show_current(animate: bool = false) -> void:
 
 
 func _on_card_pressed() -> void:
-	if _animating or _pos >= _queue.size() or _flipped:
+	if _animating or _pos >= _queue.size():
 		return
 	var fc: Dictionary = _by_id.get(String(_queue[_pos]), {})
-	_flipped = true
-	_hint.text = Game.t("flashcards.grade_hint")
-	_again_btn.disabled = false
-	_got_btn.disabled = false
-	_flip_card(String(fc.get("definition", "")))
+	_flipped = not _flipped
+	if _flipped:
+		_revealed = true
+		_again_btn.disabled = false
+		_got_btn.disabled = false
+		_hint.text = Game.t("flashcards.grade_hint")
+		_flip_card(String(fc.get("definition", "")))
+	else:
+		_hint.text = Game.t("flashcards.flip_hint")
+		_flip_card(String(fc.get("term", String(_queue[_pos]))))
 
 
 func _flip_card(new_text: String) -> void:
@@ -135,7 +142,7 @@ func _flip_card(new_text: String) -> void:
 
 
 func _on_grade(success: bool) -> void:
-	if _animating or not _flipped or _pos >= _queue.size():
+	if _animating or not _revealed or _pos >= _queue.size():
 		return
 	var fc_id := String(_queue[_pos])
 	for i in range(_cards.size()):
