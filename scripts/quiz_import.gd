@@ -8,6 +8,34 @@ const REQUIRED_FIELDS := ["id", "stem", "options", "answers", "type", "explanati
 const VALID_TYPES := ["single", "select_two"]
 const OPTION_KEYS := ["A", "B", "C", "D"]
 const MAX_REPORTED_ERRORS := 12
+const MAX_QUESTIONS := 1000
+const MAX_OPTIONS := 12
+const MAX_TEXT_LEN := 4000
+const MAX_OPTION_TEXT_LEN := 1500
+const MAX_ID_LEN := 200
+const MAX_IMPORT_BYTES := 2000000
+const MIN_DOMAIN := 0
+const MAX_DOMAIN := 99
+
+
+## True when a string carries ASCII control characters (other than tab and
+## newline) or Unicode bidi-override / zero-width formatting characters, which
+## can be used to spoof or break the on-screen layout. Such strings are
+## rejected at validation time instead of being rendered as-is.
+static func has_unsafe_chars(s: String) -> bool:
+	for ch in s:
+		var cp := ch.unicode_at(0)
+		if cp < 0x20 and cp != 0x09 and cp != 0x0A and cp != 0x0D:
+			return true
+		if cp == 0x7F:
+			return true
+		if cp >= 0x202A and cp <= 0x202E:
+			return true
+		if cp >= 0x2066 and cp <= 0x2069:
+			return true
+		if cp == 0x200B or cp == 0x200E or cp == 0x200F or cp == 0xFEFF:
+			return true
+	return false
 
 
 ## Coerce a raw parsed JSON value into the canonical {questions: [...]} shape.
@@ -37,6 +65,9 @@ static func validate_bank(data) -> Dictionary:
 	if qs.is_empty():
 		errors.append("The set has no questions (expected an array or {\"questions\": [...]}).")
 		return {"ok": false, "errors": errors, "count": 0}
+	if qs.size() > MAX_QUESTIONS:
+		errors.append("The set has too many questions (%d); the limit is %d." % [qs.size(), MAX_QUESTIONS])
+		return {"ok": false, "errors": errors, "count": qs.size()}
 
 	var seen_ids := {}
 	for i in range(qs.size()):
@@ -62,21 +93,40 @@ static func validate_bank(data) -> Dictionary:
 
 		if qid.strip_edges() == "":
 			errors.append("%s: empty id" % label)
+		elif qid.length() > MAX_ID_LEN:
+			errors.append("%s: id is too long (limit %d)" % [label, MAX_ID_LEN])
+		elif has_unsafe_chars(qid):
+			errors.append("%s: id has control or formatting characters" % label)
 		elif seen_ids.has(qid):
 			errors.append("%s: duplicate id" % label)
 		seen_ids[qid] = true
 
-		if String(q.get("stem", "")).strip_edges() == "":
+		var stem_s := String(q.get("stem", ""))
+		if stem_s.strip_edges() == "":
 			errors.append("%s: empty stem" % label)
-		if String(q.get("explanation", "")).strip_edges() == "":
+		elif stem_s.length() > MAX_TEXT_LEN:
+			errors.append("%s: stem is too long (limit %d)" % [label, MAX_TEXT_LEN])
+		elif has_unsafe_chars(stem_s):
+			errors.append("%s: stem has control or formatting characters" % label)
+		var expl_s := String(q.get("explanation", ""))
+		if expl_s.strip_edges() == "":
 			errors.append("%s: empty explanation" % label)
-		if typeof(q.get("domain")) != TYPE_FLOAT and typeof(q.get("domain")) != TYPE_INT:
+		elif expl_s.length() > MAX_TEXT_LEN:
+			errors.append("%s: explanation is too long (limit %d)" % [label, MAX_TEXT_LEN])
+		elif has_unsafe_chars(expl_s):
+			errors.append("%s: explanation has control or formatting characters" % label)
+		var dom = q.get("domain")
+		if typeof(dom) != TYPE_FLOAT and typeof(dom) != TYPE_INT:
 			errors.append("%s: domain must be a number" % label)
+		elif not is_finite(float(dom)) or float(dom) < MIN_DOMAIN or float(dom) > MAX_DOMAIN:
+			errors.append("%s: domain is out of range (%d..%d)" % [label, MIN_DOMAIN, MAX_DOMAIN])
 
 		var keys: Array = []
 		var opts = q.get("options")
 		if typeof(opts) != TYPE_ARRAY or (opts as Array).is_empty():
 			errors.append("%s: options must be a non-empty array" % label)
+		elif (opts as Array).size() > MAX_OPTIONS:
+			errors.append("%s: too many options (limit %d)" % [label, MAX_OPTIONS])
 		else:
 			for opt in opts:
 				if typeof(opt) != TYPE_DICTIONARY:
@@ -87,8 +137,13 @@ static func validate_bank(data) -> Dictionary:
 					errors.append("%s: option with empty key" % label)
 				elif keys.has(key):
 					errors.append("%s: duplicate option key '%s'" % [label, key])
-				if String((opt as Dictionary).get("text", "")).strip_edges() == "":
+				var otext := String((opt as Dictionary).get("text", ""))
+				if otext.strip_edges() == "":
 					errors.append("%s: option '%s' has empty text" % [label, key])
+				elif otext.length() > MAX_OPTION_TEXT_LEN:
+					errors.append("%s: option '%s' text is too long (limit %d)" % [label, key, MAX_OPTION_TEXT_LEN])
+				elif has_unsafe_chars(otext):
+					errors.append("%s: option '%s' has control or formatting characters" % [label, key])
 				keys.append(key)
 
 		var answers = q.get("answers")

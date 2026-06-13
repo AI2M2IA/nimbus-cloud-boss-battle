@@ -198,7 +198,11 @@ func _on_file_selected(path: String) -> void:
 	if f == null:
 		_set_status(import_status, Game.t("custom.invalid_json"), false)
 		return
-	import_text.text = f.get_as_text()
+	var raw := f.get_as_text()
+	if raw.length() > QuizImport.MAX_IMPORT_BYTES:
+		_set_status(import_status, Game.t("custom.invalid_json"), false)
+		return
+	import_text.text = raw
 	if import_name_edit.text.strip_edges() == "":
 		import_name_edit.text = path.get_file().get_basename()
 
@@ -207,6 +211,9 @@ func _on_import_pressed() -> void:
 	var set_name := import_name_edit.text.strip_edges()
 	if set_name == "":
 		_set_status(import_status, Game.t("custom.name_required"), false)
+		return
+	if import_text.text.length() > QuizImport.MAX_IMPORT_BYTES:
+		_set_status(import_status, Game.t("custom.invalid_json"), false)
 		return
 	var data = JSON.parse_string(import_text.text)
 	if data == null:
