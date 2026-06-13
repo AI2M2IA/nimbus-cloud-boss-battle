@@ -2,8 +2,8 @@ name: Pages
 
 # Export the Web (HTML5) build and publish it to GitHub Pages.
 # Requires repo Settings -> Pages -> Source = "GitHub Actions".
-# The Web preset is single-threaded (thread_support disabled) so the build
-# runs on Pages without the COOP/COEP headers Godot's threaded build needs.
+# Single-threaded (thread_support disabled) so it runs on Pages without the
+# COOP/COEP headers Godot's threaded build needs.
 
 on:
   push:
@@ -51,7 +51,19 @@ jobs:
           name="Web"
           platform="Web"
           runnable=true
+          advanced_options=false
+          dedicated_server=false
+          custom_features=""
+          export_filter="all_resources"
+          include_filter=""
+          exclude_filter=""
           export_path="build/web/index.html"
+          encryption_include_filters=""
+          encryption_exclude_filters=""
+          seed=0
+          encrypt_pck=false
+          encrypt_directory=false
+          script_export_mode=2
 
           [preset.0.options]
           variant/thread_support=false
