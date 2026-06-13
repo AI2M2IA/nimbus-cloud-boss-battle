@@ -1,0 +1,117 @@
+name: Release
+
+# On a v* tag: build the Web build plus unsigned Linux, macOS, and Windows
+# desktop binaries, then publish them on a GitHub Release. Unsigned is by
+# design (signing macOS needs an Apple Developer account tied to a legal name,
+# which would break the project's pseudonymous identity). Building in CI also
+# keeps any local user paths out of the binaries.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build web + unsigned desktop binaries
+    runs-on: ubuntu-latest
+    env:
+      GODOT_VERSION: "4.6.3"
+      GAME: NimbusCloudBossBattle
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot ${{ env.GODOT_VERSION }} + export templates
+        run: |
+          set -euo pipefail
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -fL -o godot.zip "${base}/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q -o godot.zip
+          mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot && chmod +x godot
+          curl -fL -o templates.tpz "${base}/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q -o templates.tpz -d _tpl
+          dest="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$dest"
+          mv _tpl/templates/* "$dest/"
+
+      - name: Write export presets (unsigned; pseudonymous metadata)
+        run: |
+          cat > export_presets.cfg <<'CFG'
+          [preset.0]
+          name="Web"
+          platform="Web"
+          runnable=true
+          export_path="build/web/index.html"
+          [preset.0.options]
+          variant/thread_support=false
+          html/export_icon=true
+
+          [preset.1]
+          name="Linux"
+          platform="Linux/X11"
+          runnable=true
+          export_path="build/linux/NimbusCloudBossBattle.x86_64"
+          [preset.1.options]
+          binary_format/embed_pck=true
+
+          [preset.2]
+          name="Windows"
+          platform="Windows Desktop"
+          runnable=true
+          export_path="build/windows/NimbusCloudBossBattle.exe"
+          [preset.2.options]
+          binary_format/embed_pck=true
+          application/company_name="AI(2)M(2)IA"
+          application/product_name="Nimbus Cloud Boss Battle"
+          application/file_description="Nimbus Cloud Boss Battle"
+          application/copyright="(c) 2026 AI(2)M(2)IA"
+
+          [preset.3]
+          name="macOS"
+          platform="macOS"
+          runnable=true
+          export_path="build/macos/NimbusCloudBossBattle.zip"
+          [preset.3.options]
+          binary_format/embed_pck=true
+          application/bundle_identifier="io.github.ai2m2ia.nimbus"
+          application/copyright="(c) 2026 AI(2)M(2)IA"
+          codesign/codesign=0
+          notarization/notarization=0
+          CFG
+
+      - name: Export all platforms
+        run: |
+          set -euo pipefail
+          mkdir -p build/web build/linux build/windows build/macos
+          ./godot --headless --path . --import || true
+          ./godot --headless --path . --export-release "Web" "build/web/index.html"
+          ./godot --headless --path . --export-release "Linux" "build/linux/${GAME}.x86_64"
+          ./godot --headless --path . --export-release "Windows" "build/windows/${GAME}.exe"
+          ./godot --headless --path . --export-release "macOS" "build/macos/${GAME}.zip"
+
+      - name: Package artifacts
+        run: |
+          set -euo pipefail
+          ver="${GITHUB_REF_NAME}"
+          mkdir -p dist
+          ( cd build/web && zip -q -r "${GITHUB_WORKSPACE}/dist/${GAME}-${ver}-web.zip" . )
+          ( cd build/linux && zip -q -j "${GITHUB_WORKSPACE}/dist/${GAME}-${ver}-linux.zip" . )
+          ( cd build/windows && zip -q -j "${GITHUB_WORKSPACE}/dist/${GAME}-${ver}-windows.zip" . )
+          cp "build/macos/${GAME}.zip" "dist/${GAME}-${ver}-macos.zip"
+          ls -la dist
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            Free and open source (AGPL-3.0). Web build plus unsigned desktop builds for Linux, macOS, and Windows.
+
+            macOS is unsigned: right-click the app and choose Open, or go to System Settings -> Privacy & Security -> Open Anyway. This is expected for unsigned open-source builds.
+
+            A signed, auto-updating build for Steam and itch.io is planned and will be announced on the project site when it lands. Those are a convenience; the game stays free and open source here.
