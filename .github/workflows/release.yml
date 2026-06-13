@@ -146,9 +146,10 @@ jobs:
           set -euo pipefail
           ver="${GITHUB_REF_NAME}"
           mkdir -p dist
+          echo "=== build tree ==="; ls -laR build || true
           ( cd build/web && zip -q -r "${GITHUB_WORKSPACE}/dist/${GAME}-${ver}-web.zip" . )
-          ( cd build/linux && zip -q -j "${GITHUB_WORKSPACE}/dist/${GAME}-${ver}-linux.zip" . )
-          ( cd build/windows && zip -q -j "${GITHUB_WORKSPACE}/dist/${GAME}-${ver}-windows.zip" . )
+          ( cd build/linux && zip -q -j "${GITHUB_WORKSPACE}/dist/${GAME}-${ver}-linux.zip" ./* )
+          ( cd build/windows && zip -q -j "${GITHUB_WORKSPACE}/dist/${GAME}-${ver}-windows.zip" ./* )
           cp "build/macos/${GAME}.zip" "dist/${GAME}-${ver}-macos.zip"
           ls -la dist
 
