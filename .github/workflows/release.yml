@@ -144,7 +144,7 @@ jobs:
       - name: Package artifacts
         run: |
           set -euo pipefail
-          ver="${GITHUB_REF_NAME}"
+          ver="${GITHUB_REF_NAME//\//-}"
           mkdir -p dist
           echo "=== build tree ==="; ls -laR build || true
           ( cd build/web && zip -q -r "${GITHUB_WORKSPACE}/dist/${GAME}-${ver}-web.zip" . )
