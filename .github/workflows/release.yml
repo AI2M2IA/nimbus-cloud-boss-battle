@@ -2,9 +2,9 @@ name: Release
 
 # On a v* tag: build the Web build plus unsigned Linux, macOS, and Windows
 # desktop binaries, then publish them on a GitHub Release. Unsigned is by
-# design (signing macOS needs an Apple Developer account tied to a legal name,
-# which would break the project's pseudonymous identity). Building in CI also
-# keeps any local user paths out of the binaries.
+# design (signing macOS needs an Apple Developer account tied to a legal name).
+# Also runnable via workflow_dispatch to validate all exports without
+# publishing (the release step is guarded to tag pushes only).
 
 on:
   push:
@@ -44,7 +44,19 @@ jobs:
           name="Web"
           platform="Web"
           runnable=true
+          advanced_options=false
+          dedicated_server=false
+          custom_features=""
+          export_filter="all_resources"
+          include_filter=""
+          exclude_filter=""
           export_path="build/web/index.html"
+          encryption_include_filters=""
+          encryption_exclude_filters=""
+          seed=0
+          encrypt_pck=false
+          encrypt_directory=false
+          script_export_mode=2
           [preset.0.options]
           variant/thread_support=false
           html/export_icon=true
@@ -53,7 +65,19 @@ jobs:
           name="Linux"
           platform="Linux/X11"
           runnable=true
+          advanced_options=false
+          dedicated_server=false
+          custom_features=""
+          export_filter="all_resources"
+          include_filter=""
+          exclude_filter=""
           export_path="build/linux/NimbusCloudBossBattle.x86_64"
+          encryption_include_filters=""
+          encryption_exclude_filters=""
+          seed=0
+          encrypt_pck=false
+          encrypt_directory=false
+          script_export_mode=2
           [preset.1.options]
           binary_format/embed_pck=true
 
@@ -61,7 +85,19 @@ jobs:
           name="Windows"
           platform="Windows Desktop"
           runnable=true
+          advanced_options=false
+          dedicated_server=false
+          custom_features=""
+          export_filter="all_resources"
+          include_filter=""
+          exclude_filter=""
           export_path="build/windows/NimbusCloudBossBattle.exe"
+          encryption_include_filters=""
+          encryption_exclude_filters=""
+          seed=0
+          encrypt_pck=false
+          encrypt_directory=false
+          script_export_mode=2
           [preset.2.options]
           binary_format/embed_pck=true
           application/company_name="AI(2)M(2)IA"
@@ -73,9 +109,22 @@ jobs:
           name="macOS"
           platform="macOS"
           runnable=true
+          advanced_options=false
+          dedicated_server=false
+          custom_features=""
+          export_filter="all_resources"
+          include_filter=""
+          exclude_filter=""
           export_path="build/macos/NimbusCloudBossBattle.zip"
+          encryption_include_filters=""
+          encryption_exclude_filters=""
+          seed=0
+          encrypt_pck=false
+          encrypt_directory=false
+          script_export_mode=2
           [preset.3.options]
-          binary_format/embed_pck=true
+          export/distribution_type=1
+          binary_format/architecture="universal"
           application/bundle_identifier="io.github.ai2m2ia.nimbus"
           application/copyright="(c) 2026 AI(2)M(2)IA"
           codesign/codesign=0
@@ -114,4 +163,4 @@ jobs:
 
             macOS is unsigned: right-click the app and choose Open, or go to System Settings -> Privacy & Security -> Open Anyway. This is expected for unsigned open-source builds.
 
-            A signed, auto-updating build for Steam and itch.io is planned and will be announced on the project site when it lands. Those are a convenience; the game stays free and open source here.
+            A signed, auto-updating build for Steam and itch.io is planned and will be announced on the project site when it lands.
