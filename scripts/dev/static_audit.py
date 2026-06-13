@@ -15,6 +15,11 @@ from urllib.parse import urlparse
 
 
 ALLOWED_EMAILS = {"AI2M2IA@users.noreply.github.com"}
+# GitHub no-reply addresses are not personal leaks: the account no-reply
+# (bare or numeric-id form) and GitHub's web-flow committer are allowed.
+GITHUB_NOREPLY_RE = re.compile(
+    r"^(?:noreply@github\.com|[A-Za-z0-9._%+-]+@users\.noreply\.github\.com)$"
+)
 
 EMAIL_RE = re.compile(
     r"(?<![\w.+-])([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})(?![\w.-])"
@@ -358,7 +363,7 @@ def scan_text(path: Path, text: str, findings: list[Finding]) -> None:
     for line_number, line in enumerate(text.splitlines(), start=1):
         for match in EMAIL_RE.finditer(line):
             email = match.group(1)
-            if email not in ALLOWED_EMAILS:
+            if email not in ALLOWED_EMAILS and not GITHUB_NOREPLY_RE.match(email):
                 findings.append(
                     Finding(rel, line_number, f"personal email address: {email}")
                 )
