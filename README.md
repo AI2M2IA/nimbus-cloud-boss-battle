@@ -2,6 +2,14 @@
 
 A gamified version of the SAA-C03 practice exam from *Let's Learn AWS Together*, built with Godot 4. Each exam domain is a boss fight.
 
+## Play it
+
+Play in your browser at https://ai2m2ia.github.io/nimbus-cloud-boss-battle/, or download a desktop build (Linux, macOS, Windows) from the [Releases](https://github.com/AI2M2IA/nimbus-cloud-boss-battle/releases) page.
+
+The desktop builds are **unsigned and free**. On macOS, Gatekeeper warns that the developer cannot be verified — right-click the app and choose **Open**, or go to **System Settings -> Privacy & Security -> Open Anyway**. This is expected for unsigned open-source builds.
+
+A signed, auto-updating build for **Steam and itch.io** is planned and will be announced on the project site when it lands. Those versions are a convenience; the game is and always will be free and open source here.
+
 ## How it plays
 
 Pick a boss on the menu — one per exam domain, plus a cross-domain warm-up and the Final Gauntlet (all 65 exam questions):
