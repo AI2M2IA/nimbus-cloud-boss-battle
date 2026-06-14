@@ -6,7 +6,15 @@ A gamified version of the SAA-C03 practice exam from *Let's Learn AWS Together*,
 
 Play in your browser at https://ai2m2ia.github.io/nimbus-cloud-boss-battle/, or download a desktop build (Linux, macOS, Windows) from the [Releases](https://github.com/AI2M2IA/nimbus-cloud-boss-battle/releases) page.
 
-The desktop builds are **unsigned and free**. On macOS, Gatekeeper warns that the developer cannot be verified — right-click the app and choose **Open**, or go to **System Settings -> Privacy & Security -> Open Anyway**. This is expected for unsigned open-source builds.
+The desktop builds are **free and open source**. The macOS build is **ad-hoc signed but not notarized** (notarization needs a paid Apple Developer ID, which would tie the release to a legal name). On first launch, right-click the app and choose **Open**, or go to **System Settings → Privacy & Security → Open Anyway**.
+
+If macOS still says the app is *"damaged and can't be opened"* — common on Apple Silicon for non-notarized apps — clear the download quarantine in Terminal:
+
+```
+xattr -dr com.apple.quarantine "Nimbus Cloud Boss Battle.app"
+```
+
+The app is safe; macOS simply can't verify a paid developer identity. This is expected for ad-hoc, open-source builds.
 
 A signed, auto-updating build for **Steam and itch.io** is planned and will be announced on the project site when it lands. Those versions are a convenience; the game is and always will be free and open source here.
 
