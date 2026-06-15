@@ -16,6 +16,8 @@ xattr -dr com.apple.quarantine "Nimbus Cloud Boss Battle.app"
 
 The app is safe; macOS simply can't verify a paid developer identity. This is expected for ad-hoc, open-source builds.
 
+On **Windows**, the unsigned `.exe` may trigger SmartScreen (*"Windows protected your PC"*) — click **More info → Run anyway**. It is the same unsigned-app notice; the build is safe.
+
 A signed, auto-updating build for **Steam and itch.io** is planned and will be announced on the project site when it lands. Those versions are a convenience; the game is and always will be free and open source here.
 
 ## How it plays
