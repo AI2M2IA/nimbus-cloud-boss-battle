@@ -4,6 +4,7 @@ extends Control
 
 const ModeRules := preload("res://scripts/mode_rules.gd")
 const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
+const UITheme := preload("res://scripts/ui_theme.gd")
 
 
 func _ready() -> void:

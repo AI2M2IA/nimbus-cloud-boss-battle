@@ -3,6 +3,7 @@ extends Control
 ## box state persists in the player save via the Game autoload.
 
 const ReviewSchedulerScript := preload("res://scripts/review_scheduler.gd")
+const UITheme := preload("res://scripts/ui_theme.gd")
 
 var _rs
 var _cards: Array = []
