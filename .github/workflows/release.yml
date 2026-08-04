@@ -1,10 +1,11 @@
 name: Release
 
-# On a v* tag: build the Web build plus unsigned Linux, macOS, and Windows
-# desktop binaries, then publish them on a GitHub Release. Unsigned is by
-# design (signing macOS needs an Apple Developer account tied to a legal name).
-# Also runnable via workflow_dispatch to validate all exports without
-# publishing (the release step is guarded to tag pushes only).
+# On a v* tag: build the Web build plus Linux, macOS, and Windows desktop
+# binaries, then publish them on a GitHub Release. The macOS app is ad-hoc
+# signed (via rcodesign) so Apple Silicon will launch it; full Developer-ID
+# signing + notarization is intentionally skipped (it needs a paid Apple account
+# tied to a legal name). Also runnable via workflow_dispatch to validate all
+# exports without publishing (the release step is guarded to tag pushes only).
 
 on:
   push:
@@ -21,6 +22,10 @@ jobs:
     env:
       GODOT_VERSION: "4.6.3"
       GAME: NimbusCloudBossBattle
+      # Pinned rcodesign (apple-codesign) release + its verified sha256 — see
+      # the signing step below for why this isn't resolved dynamically.
+      RCODESIGN_VERSION: "0.29.0"
+      RCODESIGN_SHA256: "dbe85cedd8ee4217b64e9a0e4c2aef92ab8bcaaa41f20bde99781ff02e600002"
     steps:
       - uses: actions/checkout@v4
 
@@ -141,6 +146,40 @@ jobs:
           ./godot --headless --path . --export-release "Windows" "build/windows/${GAME}.exe"
           ./godot --headless --path . --export-release "macOS" "build/macos/${GAME}.zip"
 
+      - name: Ad-hoc sign the macOS app (rcodesign)
+        run: |
+          set -euo pipefail
+          # Apple Silicon refuses to launch unsigned binaries ("damaged and can't
+          # be opened"). An ad-hoc signature lets the app load; Gatekeeper then
+          # shows the normal "unidentified developer" prompt (right-click -> Open /
+          # Open Anyway) instead of a hard block. Notarization still needs a paid
+          # Apple Developer ID, so we stay ad-hoc: pseudonym-safe and zero cost.
+          # rcodesign (apple-codesign) ad-hoc signs Mach-O/.app bundles on Linux.
+          # Pinned to a specific release + verified sha256 (env above) rather
+          # than resolved dynamically: an unpinned "latest release" lookup would
+          # silently start running whatever the upstream maintainer publishes
+          # next, with no review on our side, in a step that has write access
+          # to the release artifacts. Bump the version/checksum deliberately —
+          # download the new asset, inspect it, compute its sha256 — when a
+          # newer rcodesign is actually needed.
+          asset="apple-codesign-${RCODESIGN_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          url="https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F${RCODESIGN_VERSION}/${asset}"
+          curl -fsSL -o rcodesign.tar.gz "$url"
+          echo "${RCODESIGN_SHA256}  rcodesign.tar.gz" | sha256sum -c -
+          tar -xzf rcodesign.tar.gz
+          rc="$(find . -type f -name rcodesign | head -1)"
+          test -n "$rc" || { echo "rcodesign binary not found"; exit 1; }
+          chmod +x "$rc"
+          # Godot exports the .app inside build/macos/<GAME>.zip — unzip, sign, rezip.
+          ( cd build/macos && unzip -q "${GAME}.zip" -d _signed && rm "${GAME}.zip" )
+          app="$(find build/macos/_signed -maxdepth 1 -name '*.app' | head -1)"
+          test -n "$app" || { echo "no .app found in macOS export"; exit 1; }
+          "$rc" sign "$app"
+          # Repackage preserving symlinks (-y) so the bundle stays valid.
+          ( cd build/macos/_signed && zip -q -r -y "../${GAME}.zip" "$(basename "$app")" )
+          rm -rf build/macos/_signed
+          echo "Ad-hoc signed $(basename "$app")"
+
       - name: Package artifacts
         run: |
           set -euo pipefail
@@ -160,8 +199,12 @@ jobs:
           files: dist/*
           generate_release_notes: true
           body: |
-            Free and open source (AGPL-3.0). Web build plus unsigned desktop builds for Linux, macOS, and Windows.
+            Free and open source (AGPL-3.0). Web build plus desktop builds for Linux, macOS, and Windows.
 
-            macOS is unsigned: right-click the app and choose Open, or go to System Settings -> Privacy & Security -> Open Anyway. This is expected for unsigned open-source builds.
+            The macOS build is ad-hoc signed but not notarized. On first launch, right-click the app and choose Open (or System Settings -> Privacy & Security -> Open Anyway). If macOS still says the app is "damaged and can't be opened" (common on Apple Silicon), clear the download quarantine in Terminal:
+
+                xattr -dr com.apple.quarantine "Nimbus Cloud Boss Battle.app"
+
+            Notarization would require a paid Apple Developer ID tied to a legal name, so these open-source builds stay ad-hoc.
 
             A signed, auto-updating build for Steam and itch.io is planned and will be announced on the project site when it lands.
