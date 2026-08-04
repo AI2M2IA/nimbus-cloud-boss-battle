@@ -101,8 +101,10 @@ func _test_rules() -> void:
 	check(Rules.regen_heart(4), "regen at streak 4")
 	check(Rules.regen_heart(8), "regen at streak 8")
 
-	check(Rules.requeue_position(20) == 4, "requeue 4 deep in long queue")
-	check(Rules.requeue_position(2) == 2, "requeue clamps to queue size")
+	check(Rules.requeue_position(20) == 7, "requeue scales with remaining queue size (20 -> 7)")
+	check(Rules.requeue_position(65) == 22, "requeue scales for a long gauntlet-sized queue (65 -> 22)")
+	check(Rules.requeue_position(4) == 4, "requeue at the offset boundary returns queue size")
+	check(Rules.requeue_position(2) == 2, "requeue clamps to queue size for a short queue")
 	check(Rules.requeue_position(0) == 0, "requeue into empty queue")
 
 
