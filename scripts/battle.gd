@@ -3,6 +3,7 @@ extends Control
 ## Wrong = lose a heart and the question returns later in the queue.
 
 const Rules := preload("res://scripts/battle_rules.gd")
+const UITheme := preload("res://scripts/ui_theme.gd")
 const VICTORY_BONUS := 500
 
 var battle: Dictionary
@@ -35,6 +36,7 @@ var progress_label: Label
 var scroll: ScrollContainer
 var badge_label: Label
 var stem_text: RichTextLabel
+var overflow_hint: Label
 var options_box: VBoxContainer
 var confirm_btn: Button
 var explain_panel: PanelContainer
@@ -149,6 +151,15 @@ func _build_ui() -> void:
 	stem_text.add_theme_color_override("default_color", UITheme.TEXT)
 	card_box.add_child(stem_text)
 
+	# Long, multi-part scenario questions can overflow the card on the
+	# default 720p window; the scrollbar alone is easy to miss, so surface
+	# an explicit cue near the top whenever there's more to scroll to.
+	overflow_hint = UITheme.label("▼", 16, UITheme.ACCENT)
+	overflow_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	overflow_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	overflow_hint.visible = false
+	card_box.add_child(overflow_hint)
+
 	options_box = VBoxContainer.new()
 	options_box.add_theme_constant_override("separation", 8)
 	options_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -244,6 +255,18 @@ func _next_question() -> void:
 	explain_panel.visible = false
 	scroll.scroll_vertical = 0
 	_update_hud()
+	_refresh_overflow_hint()
+
+
+## Shows/hides the "more below" cue once layout settles on the new content.
+## Not awaited by callers — it updates overflow_hint whenever it resolves.
+func _refresh_overflow_hint() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if not is_instance_valid(scroll):
+		return
+	var bar := scroll.get_v_scroll_bar()
+	overflow_hint.visible = bar.max_value > bar.page
 
 
 func _on_option_pressed(key: String) -> void:

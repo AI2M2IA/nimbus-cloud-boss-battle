@@ -11,6 +11,19 @@ const Leaderboard := preload("res://scripts/leaderboard.gd")
 const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
 const ReviewSchedulerScript := preload("res://scripts/review_scheduler.gd")
 
+## Top-level scenes that must load and instantiate without a script compile
+## error. This is what would have caught the UITheme global-class-name bug
+## (a fresh clone with no .godot cache failed here, not in any pure-logic
+## test above) — those only exercise RefCounted modules, never these scenes.
+const SMOKE_SCENES := [
+	"res://scenes/main_menu.tscn",
+	"res://scenes/battle.tscn",
+	"res://scenes/mode_battle.tscn",
+	"res://scenes/custom_quiz.tscn",
+	"res://scenes/leaderboard.tscn",
+	"res://scenes/flashcards.tscn",
+]
+
 var checks := 0
 var failures := 0
 
@@ -30,6 +43,8 @@ func _initialize() -> void:
 	_test_review_scheduler()
 	_test_text_scale()
 	_test_branding()
+	_test_scene_smoke()
+	await _test_overflow_hint()
 	print("--------------------------------------------------")
 	print("%d checks, %d failure(s)" % [checks, failures])
 	quit(1 if failures > 0 else 0)
@@ -528,3 +543,71 @@ func _test_branding() -> void:
 			bad += 1
 	check(bad == 0, "menu.title is the official name in all %d locales" % gs.LANGS.size())
 	gs.free()
+
+# ---------------------------------------------------------------- scene smoke
+
+## Every top-level scene must load and instantiate cleanly. Scripts that lean
+## on a bare global class_name identifier (like UITheme) instead of an
+## explicit preload only fail here — a fresh clone with no .godot cache has
+## no global-script-class cache yet, and none of the checks above touch a
+## scene at all, so they stayed green while the game itself failed to start.
+func _test_scene_smoke() -> void:
+	print("[scene_smoke]")
+	for scene_path in SMOKE_SCENES:
+		var packed: PackedScene = load(scene_path)
+		check(packed != null, "loads without a script compile error: %s" % scene_path)
+		if packed == null:
+			continue
+		var instance := packed.instantiate()
+		check(instance != null, "instantiates: %s" % scene_path)
+		if instance != null:
+			instance.free()
+
+
+# --------------------------------------------------------------- overflow hint
+
+## battle.gd/mode_battle.gd show a "▼" cue on the question card once its stem
+## and options are tall enough to need scrolling (long multi-part scenario
+## questions were easy to miss needing a scroll at the default window size).
+## Verifying this by screenshotting a live xdotool session turned out to be
+## unreliable: once a longer question shifts the answer buttons' positions,
+## a hardcoded click coordinate silently misses and every later screenshot in
+## the sequence is identical -- inconclusive, not a real check. This drives
+## the scene directly instead: add the real instance to the tree, force the
+## stem/options text long enough to guarantee overflow and confirm the hint
+## appears, then shrink the text back down and confirm the hint hides again.
+func _test_overflow_hint() -> void:
+	print("[overflow_hint]")
+	await _check_overflow_hint_for_scene("res://scenes/battle.tscn")
+	await _check_overflow_hint_for_scene("res://scenes/mode_battle.tscn")
+
+
+func _check_overflow_hint_for_scene(scene_path: String) -> void:
+	var packed: PackedScene = load(scene_path)
+	var instance = packed.instantiate()
+	root.add_child(instance)
+	await process_frame
+	await process_frame
+
+	var ok := is_instance_valid(instance.scroll) and is_instance_valid(instance.overflow_hint) \
+			and is_instance_valid(instance.stem_text) and is_instance_valid(instance.options_box)
+	check(ok, "%s: overflow hint UI nodes exist" % scene_path)
+	if not ok:
+		instance.queue_free()
+		return
+
+	instance.stem_text.text = "LOREM ".repeat(400)
+	for child in instance.options_box.get_children():
+		child.text = "X)  " + "filler option text ".repeat(30)
+	await instance._refresh_overflow_hint()
+	await process_frame
+	check(instance.overflow_hint.visible, "%s: hint shows once content overflows" % scene_path)
+
+	instance.stem_text.text = "Short question."
+	for child in instance.options_box.get_children():
+		child.text = "short"
+	await instance._refresh_overflow_hint()
+	await process_frame
+	check(not instance.overflow_hint.visible, "%s: hint hides again once content fits" % scene_path)
+
+	instance.queue_free()

@@ -6,6 +6,7 @@ extends Control
 ## All UI is built in code, matching main_menu.gd.
 
 const QuizImport := preload("res://scripts/quiz_import.gd")
+const UITheme := preload("res://scripts/ui_theme.gd")
 
 var pool_box: VBoxContainer
 var import_name_edit: LineEdit
@@ -198,10 +199,10 @@ func _on_file_selected(path: String) -> void:
 	if f == null:
 		_set_status(import_status, Game.t("custom.invalid_json"), false)
 		return
-	var raw := f.get_as_text()
-	if raw.length() > QuizImport.MAX_IMPORT_BYTES:
+	if f.get_length() > QuizImport.MAX_IMPORT_BYTES:
 		_set_status(import_status, Game.t("custom.invalid_json"), false)
 		return
+	var raw := f.get_as_text()
 	import_text.text = raw
 	if import_name_edit.text.strip_edges() == "":
 		import_name_edit.text = path.get_file().get_basename()

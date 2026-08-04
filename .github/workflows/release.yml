@@ -22,6 +22,10 @@ jobs:
     env:
       GODOT_VERSION: "4.6.3"
       GAME: NimbusCloudBossBattle
+      # Pinned rcodesign (apple-codesign) release + its verified sha256 — see
+      # the signing step below for why this isn't resolved dynamically.
+      RCODESIGN_VERSION: "0.29.0"
+      RCODESIGN_SHA256: "dbe85cedd8ee4217b64e9a0e4c2aef92ab8bcaaa41f20bde99781ff02e600002"
     steps:
       - uses: actions/checkout@v4
 
@@ -143,8 +147,6 @@ jobs:
           ./godot --headless --path . --export-release "macOS" "build/macos/${GAME}.zip"
 
       - name: Ad-hoc sign the macOS app (rcodesign)
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           # Apple Silicon refuses to launch unsigned binaries ("damaged and can't
@@ -153,14 +155,17 @@ jobs:
           # Open Anyway) instead of a hard block. Notarization still needs a paid
           # Apple Developer ID, so we stay ad-hoc: pseudonym-safe and zero cost.
           # rcodesign (apple-codesign) ad-hoc signs Mach-O/.app bundles on Linux.
-          # The release asset is resolved dynamically so a version bump won't 404.
-          asset_url="$(curl -fsSL -H "Authorization: Bearer ${GH_TOKEN}" \
-            "https://api.github.com/repos/indygreg/apple-platform-rs/releases?per_page=30" \
-            | jq -r '[.[] | select(.tag_name | startswith("apple-codesign/"))][0].assets[]
-                     | select(.name | test("x86_64-unknown-linux-musl.tar.gz$"))
-                     | .browser_download_url')"
-          test -n "$asset_url" || { echo "could not resolve rcodesign asset"; exit 1; }
-          curl -fsSL -o rcodesign.tar.gz "$asset_url"
+          # Pinned to a specific release + verified sha256 (env above) rather
+          # than resolved dynamically: an unpinned "latest release" lookup would
+          # silently start running whatever the upstream maintainer publishes
+          # next, with no review on our side, in a step that has write access
+          # to the release artifacts. Bump the version/checksum deliberately —
+          # download the new asset, inspect it, compute its sha256 — when a
+          # newer rcodesign is actually needed.
+          asset="apple-codesign-${RCODESIGN_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          url="https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F${RCODESIGN_VERSION}/${asset}"
+          curl -fsSL -o rcodesign.tar.gz "$url"
+          echo "${RCODESIGN_SHA256}  rcodesign.tar.gz" | sha256sum -c -
           tar -xzf rcodesign.tar.gz
           rc="$(find . -type f -name rcodesign | head -1)"
           test -n "$rc" || { echo "rcodesign binary not found"; exit 1; }

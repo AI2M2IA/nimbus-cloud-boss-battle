@@ -3,6 +3,7 @@ extends Control
 ## All UI is built in code, matching main_menu.gd.
 
 const Leaderboard := preload("res://scripts/leaderboard.gd")
+const UITheme := preload("res://scripts/ui_theme.gd")
 
 ## Board colors follow the mode cards; "boss" uses the accent orange.
 const BOARD_COLORS := {
