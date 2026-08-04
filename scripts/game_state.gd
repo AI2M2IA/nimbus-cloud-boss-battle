@@ -21,7 +21,12 @@ const BATTLES := [
 		"subtitle": "Cross-domain warm-up",
 		"domain": 0,
 		"color": "#9b8cff",
-		"hearts": 3,
+		# Was 3: with only 4 questions in the domain-0 pool, 3 hearts let a
+		# new player lose to 3 wrong answers out of 4 questions (75% error
+		# tolerance vs. ~15-29% for every other single-domain boss). Matched
+		# to the other single-domain bosses so the warm-up is not the least
+		# forgiving fight in the game.
+		"hearts": 5,
 	},
 	{
 		"id": "d1",

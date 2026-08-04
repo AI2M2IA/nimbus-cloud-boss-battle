@@ -35,6 +35,7 @@ var question_view  # QuizQuestionViewScript instance; untyped like pet_avatar
 # in mode_battle.gd, so calling show_question()/show_result() doesn't depend
 # on a class_name being registered in the global script class cache.
 var overlay: Control
+var retreat_dialog: ConfirmationDialog
 
 
 func _ready() -> void:
@@ -128,14 +129,31 @@ func _build_ui() -> void:
 	quit.text = Game.t("battle.retreat")
 	quit.flat = true
 	quit.add_theme_color_override("font_color", UITheme.TEXT_DIM)
-	quit.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
+	quit.pressed.connect(_confirm_retreat)
 	root.add_child(quit)
+
+	# A battle can run 30+ questions (the Gauntlet is 65); leaving mid-run
+	# forfeits all of it, since progress is only recorded in _end_battle().
+	# Gate the retreat link and Esc behind a confirmation so that isn't one
+	# accidental click/keypress away.
+	retreat_dialog = ConfirmationDialog.new()
+	retreat_dialog.title = Game.t("battle.retreat_confirm_title")
+	retreat_dialog.dialog_text = Game.t("battle.retreat_confirm_body")
+	retreat_dialog.ok_button_text = Game.t("battle.retreat_confirm_ok")
+	retreat_dialog.cancel_button_text = Game.t("battle.retreat_confirm_cancel")
+	retreat_dialog.confirmed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
+	add_child(retreat_dialog)
+
+
+func _confirm_retreat() -> void:
+	if not retreat_dialog.visible:
+		retreat_dialog.popup_centered()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.is_echo():
 		if (event as InputEventKey).keycode == KEY_ESCAPE:
-			get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+			_confirm_retreat()
 			get_viewport().set_input_as_handled()
 
 
@@ -221,7 +239,14 @@ func _animate_boss_hit(damage_xp: int) -> void:
 func _update_hud() -> void:
 	var remaining := total_unique - correct_done
 	boss_hp_label.text = Game.t("battle.boss_hp") % [remaining, total_unique]
-	progress_label.text = Game.t("battle.progress") % [questions_seen, queue.size() + (0 if current_q.is_empty() else 1)]
+	# Was `queue.size() + (0 if current_q.is_empty() else 1)`: right after a
+	# wrong answer, _on_answer_submitted() has already reinserted current_q
+	# into queue (for the requeue), so that expression counted it twice --
+	# once via current_q, once via the copy already sitting in queue -- until
+	# the next _next_question() call rebalanced it. `remaining` is already
+	# the correct, requeue-timing-independent count (see boss_hp_label above)
+	# so reuse it here instead of re-deriving a second, buggier one.
+	progress_label.text = Game.t("battle.progress") % [questions_seen, remaining]
 	streak_label.text = Game.t("battle.combo") % [streak, best_streak]
 	xp_label.text = Game.t("battle.xp") % xp_earned
 	var i := 0

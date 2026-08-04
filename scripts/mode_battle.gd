@@ -37,6 +37,7 @@ var question_view  # QuizQuestionViewScript instance; untyped like pet_avatar
 var pet_avatar  # PetAvatarScript instance; untyped like final_avatar below,
 # so calling set_pet()/set_progress()/react_*() doesn't depend on the
 # PetAvatar class_name being registered in the global script class cache.
+var retreat_dialog: ConfirmationDialog
 
 
 func _ready() -> void:
@@ -121,14 +122,30 @@ func _build_ui() -> void:
 	quit.text = Game.t("battle.retreat")
 	quit.flat = true
 	quit.add_theme_color_override("font_color", UITheme.TEXT_DIM)
-	quit.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
+	quit.pressed.connect(_confirm_retreat)
 	root.add_child(quit)
+
+	# Same rationale as battle.gd: a run can be dozens of questions long and
+	# progress is only recorded in _end_run(), so leaving mid-run forfeits it
+	# silently unless the retreat link and Esc are gated behind a confirm.
+	retreat_dialog = ConfirmationDialog.new()
+	retreat_dialog.title = Game.t("battle.retreat_confirm_title")
+	retreat_dialog.dialog_text = Game.t("battle.retreat_confirm_body")
+	retreat_dialog.ok_button_text = Game.t("battle.retreat_confirm_ok")
+	retreat_dialog.cancel_button_text = Game.t("battle.retreat_confirm_cancel")
+	retreat_dialog.confirmed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
+	add_child(retreat_dialog)
+
+
+func _confirm_retreat() -> void:
+	if not retreat_dialog.visible:
+		retreat_dialog.popup_centered()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.is_echo():
 		if (event as InputEventKey).keycode == KEY_ESCAPE:
-			get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+			_confirm_retreat()
 			get_viewport().set_input_as_handled()
 
 

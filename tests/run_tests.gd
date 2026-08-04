@@ -65,6 +65,7 @@ func _initialize() -> void:
 	_test_scene_smoke()
 	await _test_overflow_hint()
 	await _test_select_two_keyboard()
+	await _test_retreat_confirmation()
 	print("--------------------------------------------------")
 	print("%d checks, %d failure(s)" % [checks, failures])
 	quit(1 if failures > 0 else 0)
@@ -732,3 +733,48 @@ func _press_key(node, keycode: int) -> void:
 	event.keycode = keycode
 	event.pressed = true
 	node._unhandled_input(event)
+
+
+# ------------------------------------------------------- retreat confirmation
+
+## "Retreat to menu" and Esc must not discard an in-progress battle/run
+## without confirmation (see _confirm_retreat() in battle.gd/mode_battle.gd):
+## both should open retreat_dialog instead of calling change_scene_to_file
+## directly. Only the gating is exercised here -- actually confirming would
+## call change_scene_to_file on this suite's own SceneTree, the same boundary
+## _test_overflow_hint/_test_select_two_keyboard already stay inside.
+func _test_retreat_confirmation() -> void:
+	print("[retreat_confirmation]")
+	await _check_retreat_confirmation_for_scene("res://scenes/battle.tscn")
+	await _check_retreat_confirmation_for_scene("res://scenes/mode_battle.tscn")
+
+
+func _check_retreat_confirmation_for_scene(scene_path: String) -> void:
+	var packed: PackedScene = load(scene_path)
+	var instance = packed.instantiate()
+	root.add_child(instance)
+	await process_frame
+	await process_frame
+
+	var dialog = instance.retreat_dialog
+	var ok := is_instance_valid(dialog)
+	check(ok, "%s: retreat_dialog exists" % scene_path)
+	if not ok:
+		instance.queue_free()
+		return
+	check(not dialog.visible, "%s: retreat_dialog starts hidden" % scene_path)
+
+	# The "Retreat to menu" button routes through _confirm_retreat(), same as
+	# Esc -- call it directly (same pattern _press_key uses for input) rather
+	# than searching the tree for the button.
+	instance._confirm_retreat()
+	await process_frame
+	check(dialog.visible, "%s: retreat button opens the confirmation dialog instead of leaving immediately" % scene_path)
+
+	dialog.hide()
+	await process_frame
+	_press_key(instance, KEY_ESCAPE)
+	await process_frame
+	check(dialog.visible, "%s: Esc also opens the confirmation dialog instead of leaving immediately" % scene_path)
+
+	instance.queue_free()
