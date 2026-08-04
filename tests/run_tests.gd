@@ -10,6 +10,15 @@ const QuizImport := preload("res://scripts/quiz_import.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd")
 const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
 const ReviewSchedulerScript := preload("res://scripts/review_scheduler.gd")
+# Deliberately NOT preloading scripts/ui/quiz_question_view.gd as a top-level
+# const here: battle.gd/mode_battle.gd already preload it themselves, and a
+# *second* top-level preload of the same script from this file (the -s main
+# script) corrupts their reference at runtime -- Battle._build_ui() would
+# fail with "Nonexistent function 'new' in base 'GDScript'" the moment any
+# earlier test in this suite ran before a battle/mode_battle scene got
+# add_child()'d. Grab the already-configured view from a real scene instance
+# instead (see _test_select_two_keyboard), the same way _test_overflow_hint
+# does, rather than instantiating the component standalone.
 
 ## Top-level scenes that must load and instantiate without a script compile
 ## error. This is what would have caught the UITheme global-class-name bug
@@ -26,6 +35,16 @@ const SMOKE_SCENES := [
 
 var checks := 0
 var failures := 0
+
+# Scratch slot a test can point a signal at. GDScript lambdas capture outer
+# locals by value, not by reference, so `signal.connect(func(x): local = x)`
+# silently never writes back to `local` -- routing through an instance
+# method + instance var sidesteps that trap.
+var _last_signal_payload = null
+
+
+func _capture_signal_payload(payload) -> void:
+	_last_signal_payload = payload
 
 
 func _initialize() -> void:
@@ -45,6 +64,7 @@ func _initialize() -> void:
 	_test_branding()
 	_test_scene_smoke()
 	await _test_overflow_hint()
+	await _test_select_two_keyboard()
 	print("--------------------------------------------------")
 	print("%d checks, %d failure(s)" % [checks, failures])
 	quit(1 if failures > 0 else 0)
@@ -591,25 +611,124 @@ func _check_overflow_hint_for_scene(scene_path: String) -> void:
 	await process_frame
 	await process_frame
 
-	var ok := is_instance_valid(instance.scroll) and is_instance_valid(instance.overflow_hint) \
-			and is_instance_valid(instance.stem_text) and is_instance_valid(instance.options_box)
+	# battle.gd/mode_battle.gd delegate the question card to a shared
+	# QuizQuestionView (scripts/ui/quiz_question_view.gd); scroll/
+	# overflow_hint/stem_text/options_box live on that child now, not on
+	# the scene's own root instance.
+	var view = instance.question_view
+	var ok := is_instance_valid(view) and is_instance_valid(view.scroll) \
+			and is_instance_valid(view.overflow_hint) and is_instance_valid(view.stem_text) \
+			and is_instance_valid(view.options_box)
 	check(ok, "%s: overflow hint UI nodes exist" % scene_path)
 	if not ok:
 		instance.queue_free()
 		return
 
-	instance.stem_text.text = "LOREM ".repeat(400)
-	for child in instance.options_box.get_children():
+	view.stem_text.text = "LOREM ".repeat(400)
+	for child in view.options_box.get_children():
 		child.text = "X)  " + "filler option text ".repeat(30)
-	await instance._refresh_overflow_hint()
+	await view._refresh_overflow_hint()
 	await process_frame
-	check(instance.overflow_hint.visible, "%s: hint shows once content overflows" % scene_path)
+	check(view.overflow_hint.visible, "%s: hint shows once content overflows" % scene_path)
 
-	instance.stem_text.text = "Short question."
-	for child in instance.options_box.get_children():
+	view.stem_text.text = "Short question."
+	for child in view.options_box.get_children():
 		child.text = "short"
-	await instance._refresh_overflow_hint()
+	await view._refresh_overflow_hint()
 	await process_frame
-	check(not instance.overflow_hint.visible, "%s: hint hides again once content fits" % scene_path)
+	check(not view.overflow_hint.visible, "%s: hint hides again once content fits" % scene_path)
 
 	instance.queue_free()
+
+
+# --------------------------------------------------------- select_two keyboard
+
+## An earlier draft of the keyboard-shortcut feature (from a third-party
+## review doc) called the option handler function directly instead of going
+## through the Button -- that desyncs the button's visual pressed state from
+## selected_keys, since BaseButton only redraws on set_pressed()/toggled, not
+## on a bare function call. _activate_option() routes through the real Button
+## so this can't regress silently; this test drives that exact select_two
+## path with synthetic key events and checks the actual button_pressed state
+## after each press, not just the internal selected_keys array.
+func _test_select_two_keyboard() -> void:
+	print("[select_two_keyboard]")
+	# Drive the already-configured question_view off a real battle.tscn
+	# instance (same approach as _check_overflow_hint_for_scene) rather than
+	# instantiating QuizQuestionView standalone -- see the note by the
+	# top-of-file preload consts for why a second preload of that script
+	# from this file breaks battle.gd's own copy.
+	var packed: PackedScene = load("res://scenes/battle.tscn")
+	var instance = packed.instantiate()
+	root.add_child(instance)
+	await process_frame
+	await process_frame
+
+	var view = instance.question_view
+	if not is_instance_valid(view):
+		check(false, "select_two_keyboard: battle.tscn produced a question_view")
+		instance.queue_free()
+		return
+
+	var question := {
+		"id": "test-select-two",
+		"type": "select_two",
+		"stem": "Synthetic select_two question for keyboard toggle testing.",
+		"options": [
+			{"key": "A", "text": "Option A"},
+			{"key": "B", "text": "Option B"},
+			{"key": "C", "text": "Option C"},
+			{"key": "D", "text": "Option D"},
+		],
+		"answers": ["A", "C"],
+	}
+	view.show_question(question)
+	await process_frame
+
+	_last_signal_payload = null
+	view.answer_submitted.connect(_capture_signal_payload)
+
+	_press_key(view, KEY_A)
+	await process_frame
+	check(view.option_buttons["A"].button_pressed, "select_two: pressing A visually presses the button")
+	check(view.selected_keys == ["A"], "select_two: pressing A selects it")
+
+	_press_key(view, KEY_B)
+	await process_frame
+	check(view.option_buttons["B"].button_pressed, "select_two: pressing B visually presses the button")
+	check(view.selected_keys == ["A", "B"], "select_two: A and B both selected")
+	check(not view.confirm_btn.disabled, "select_two: confirm enables once 2 are selected")
+
+	# Re-pressing an already-selected key must toggle it back OFF visually --
+	# this is the exact bug the third-party doc's code would have missed,
+	# since calling _on_option_toggled() directly never touches button_pressed.
+	_press_key(view, KEY_A)
+	await process_frame
+	check(not view.option_buttons["A"].button_pressed, "select_two: re-pressing A visually un-presses the button")
+	check(view.selected_keys == ["B"], "select_two: re-pressing A deselects it")
+	check(view.confirm_btn.disabled, "select_two: confirm disables once back under 2")
+
+	# Re-select A so A and B are both active, then pick a third (C): the
+	# oldest selection (B) should be evicted and visually un-pressed.
+	_press_key(view, KEY_A)
+	await process_frame
+	_press_key(view, KEY_C)
+	await process_frame
+	check(view.option_buttons["C"].button_pressed, "select_two: pressing a 3rd key (C) visually presses it")
+	check(not view.option_buttons["B"].button_pressed, "select_two: 3rd pick evicts the oldest (B) visually")
+	check(view.selected_keys == ["A", "C"], "select_two: selection is now A and C")
+	check(not view.confirm_btn.disabled, "select_two: confirm stays enabled with exactly 2 selected")
+
+	# Enter, with exactly 2 selected, should submit the current selection.
+	_press_key(view, KEY_ENTER)
+	await process_frame
+	check(_last_signal_payload == ["A", "C"], "select_two: Enter submits the current selection")
+
+	instance.queue_free()
+
+
+func _press_key(node, keycode: int) -> void:
+	var event := InputEventKey.new()
+	event.keycode = keycode
+	event.pressed = true
+	node._unhandled_input(event)
