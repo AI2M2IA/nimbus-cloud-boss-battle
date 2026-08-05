@@ -260,6 +260,34 @@ func _test_question_bank() -> void:
 			% [max_share * 100.0, single_supplemental]
 	)
 
+	# Regression: questions.json carries a `counts` summary block (total /
+	# byDomain) that nothing else in the game or this test suite reads --
+	# it silently drifted out of sync with the real array after a past
+	# content edit and nobody noticed for a whole round of changes. Catch
+	# that class of mistake here. Regenerate with
+	# `python3 data/build_question_stats.py` after editing questions.json.
+	var counts: Dictionary = data.get("counts", {})
+	check(
+		int(counts.get("total", -1)) == qs.size(),
+		"counts.total (%s) matches the actual question count (%d)"
+			% [str(counts.get("total")), qs.size()]
+	)
+	var actual_by_domain := {}
+	for q in qs:
+		# JSON.parse_string() yields floats for numeric fields, and
+		# str(2.0) != "2" -- cast through int() first so the key matches
+		# the plain "0".."4" string keys the JSON file itself uses.
+		var domain_key := str(int(q.get("domain")))
+		actual_by_domain[domain_key] = actual_by_domain.get(domain_key, 0) + 1
+	var counts_by_domain: Dictionary = counts.get("byDomain", {})
+	var by_domain_matches := counts_by_domain.size() == actual_by_domain.size()
+	if by_domain_matches:
+		for domain_key in actual_by_domain:
+			if int(counts_by_domain.get(domain_key, -1)) != actual_by_domain[domain_key]:
+				by_domain_matches = false
+				break
+	check(by_domain_matches, "counts.byDomain matches the actual per-domain breakdown (stale? re-run data/build_question_stats.py)")
+
 
 # -------------------------------------------------------------- game state
 
