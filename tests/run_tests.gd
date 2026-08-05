@@ -234,6 +234,32 @@ func _test_question_bank() -> void:
 	check(bad_answers == 0, "every answer key exists in options")
 	check(bad_two == 0, "select_two questions have exactly 2 answers")
 
+	# Regression: the original supplemental batch (vpc-q00..09) had the
+	# correct answer on "A" in all 10 questions, with nothing here to catch
+	# it — a player could learn to guess a fixed letter instead of reading
+	# the question. Guards against the same mistake creeping back in for any
+	# single-answer letter, without demanding perfect balance.
+	var letter_counts := {"A": 0, "B": 0, "C": 0, "D": 0}
+	var single_supplemental := 0
+	for q in qs:
+		if String(q.get("source", "")) != "supplemental":
+			continue
+		if String(q.get("type", "")) != "single":
+			continue
+		single_supplemental += 1
+		var ans: Array = q.get("answers", [])
+		if ans.size() == 1 and letter_counts.has(String(ans[0])):
+			letter_counts[String(ans[0])] += 1
+	var max_share := 0.0
+	if single_supplemental > 0:
+		for letter in letter_counts:
+			max_share = max(max_share, float(letter_counts[letter]) / float(single_supplemental))
+	check(
+		single_supplemental == 0 or max_share <= 0.6,
+		"supplemental answers aren't dominated by one letter (worst share %.0f%% of %d)"
+			% [max_share * 100.0, single_supplemental]
+	)
+
 
 # -------------------------------------------------------------- game state
 
@@ -258,6 +284,15 @@ func _test_game_state() -> void:
 				if String(q.get("source", "")) != "exam":
 					only_exam = false
 			check(only_exam, "gauntlet uses exam questions only")
+		elif id == "d0":
+			# Regression: this used to filter strictly on domain == 0 (a
+			# 4-question pool) despite being billed as "Cross-domain warm-up".
+			var domains_seen := {}
+			for q in pool:
+				domains_seen[int(q.get("domain", -99))] = true
+			check(domains_seen.has(0), "Gatekeeper pool still includes its own domain-0 questions")
+			for d in [1, 2, 3, 4]:
+				check(domains_seen.has(d), "Gatekeeper pool includes domain %d (actually cross-domain now)" % d)
 		else:
 			var dom := int(b["domain"])
 			var only_dom := true
@@ -470,6 +505,13 @@ func _test_custom_sets() -> void:
 	var kept := gs._sanitize_custom_sets([{"id": "keep", "name": "Keep", "questions": [keepq]}])
 	check(kept.size() == 1 and kept[0]["id"] == "keep", "load keeps a set whose questions validate")
 	check(gs._sanitize_custom_sets([{"id": "bad", "name": "Bad", "questions": [{"id": "x"}]}]).is_empty(), "load drops a set with invalid questions")
+	# Regression: the ASCII-only slug used to collapse different names to the
+	# same id and silently overwrite each other -- both a punctuation-only
+	# difference and, worse, any pair of non-Latin names (which used to both
+	# collapse all the way down to the single shared id "set-unnamed").
+	check(gs._custom_set_id("My Set!") != gs._custom_set_id("My-Set"), "different names no longer collide on the same id")
+	check(gs._custom_set_id("日本語のセット") != gs._custom_set_id("另一个套装"), "two non-Latin names no longer both collapse to set-unnamed")
+	check(gs._custom_set_id("My Set") == gs._custom_set_id("My Set"), "the exact same name is still deterministic (re-import replaces)")
 	gs.free()
 	_restore_file(GameState.CUSTOM_SETS_PATH, snap_sets)
 	_restore_file(GameState.SAVE_PATH, snap_save)

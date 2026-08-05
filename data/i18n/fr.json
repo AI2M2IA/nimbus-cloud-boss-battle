@@ -115,5 +115,7 @@
   "flashcards.back": "Retour au menu",
   "menu.text_smaller": "Texte plus petit",
   "menu.text_larger": "Texte plus grand",
-  "menu.text_default": "Taille par défaut"
+  "menu.text_default": "Taille par défaut",
+  "run.pet_incomplete_title": "PAS ENCORE SAUVÉ",
+  "run.pet_incomplete": "Plus de questions avant d’atteindre 20 bonnes réponses — votre %s attend toujours. Essayez un ensemble de questions plus grand !"
 }

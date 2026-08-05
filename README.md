@@ -50,6 +50,14 @@ Besides the boss battles, the main menu offers three modes that draw from the fu
 
 All modes keep the combo/XP rules from the boss battles, show every explanation, and record a per-mode best score and attempt count in the save file. The thresholds live in `scripts/mode_rules.gd` as pure, unit-tested functions.
 
+## Custom quizzes
+
+The main menu's Custom Quiz screen lets you paste or load your own question set as JSON (capped at 2 MB / 1000 questions), or add single questions by hand — both paths run through the same validation and content limits as the shipped question bank (`scripts/quiz_import.gd`). An active custom set replaces the built-in bank for boss battles and the three extra modes alike; switch back to the official bank from the same screen. Note: the "load from file" option depends on native file-picker access, which isn't available in the Web export — use "paste JSON" there instead.
+
+## Leaderboard
+
+Survival, Points Decay, and Save the Pet runs — plus boss-battle XP — can be saved to a local, offline leaderboard (ranked, dated, top scores per mode) from the results screen. It lives in `user://leaderboard.json` next to the save file; no server or account involved.
+
 ## Flashcards (Leitner)
 
 A spaced-repetition study mode over the book's **186 flashcards** (`data/flashcards.json`). Each card shows a term; click it to flip to the definition (with a flip animation), then grade yourself **Got it** or **Again**. "Got it" promotes the card through Leitner boxes (review intervals of 0 / 2 / 5 / 10 days); "Again" sends it back to box 1. Box state persists in the save. The scheduling logic lives in `scripts/review_scheduler.gd` (pure, unit-tested).
@@ -85,7 +93,7 @@ From a terminal, `./godot.sh` launches the project and `./run-game.sh` is kept a
 
 ## Unit tests
 
-Game rules live in `scripts/battle_rules.gd` and `scripts/mode_rules.gd` (pure functions) and are covered by `tests/run_tests.gd`, along with question-bank integrity, save/record logic, mode win/lose boundaries (Survival, Points Decay, Save the Pet), and i18n consistency (key parity and matching format placeholders between `en.json` and `pt-BR.json`). Run headless from the project folder:
+Game rules live in `scripts/battle_rules.gd` and `scripts/mode_rules.gd` (pure functions) and are covered by `tests/run_tests.gd`, along with question-bank integrity, save/record logic, mode win/lose boundaries (Survival, Points Decay, Save the Pet), and i18n consistency (key parity and matching format placeholders, checked across all 19 shipped locale files against `en.json`). Run headless from the project folder:
 
 ```
 ./run-tests.sh
@@ -95,16 +103,17 @@ You can also pass raw Godot arguments through the shortcut, for example `./godot
 
 ## Updating the questions
 
-`data/questions.json` is a copy of `docs/api/questions.json` from the book site. To sync after editing the book's exam-prep questions, just copy the file over again — the game reads it at startup, nothing else to change.
+Most of `data/questions.json` mirrors `docs/api/questions.json` from the book site (the `"chapter"` and `"exam"` sourced entries); a small set of supplemental questions is also included, tagged `"source": "supplemental"`. To sync the book-sourced content after an upstream edit, replace just the `"chapter"`/`"exam"` entries — the game reads the whole file at startup either way, nothing else to change.
 
 ## Project layout
 
 ```
 project.godot           # Godot 4 config (GL Compatibility renderer — web-friendly)
 godot.sh                # local Godot shortcut; no args runs this project
-data/questions.json     # question bank (98 questions, SAA-C03 domains)
+data/questions.json     # question bank (108 questions, SAA-C03 domains)
 data/flashcards.json    # 186 Leitner flashcards (from the book)
 data/i18n/              # UI translations (en.json fallback, pt-BR.json, ...)
+docs/                   # roadmap, release checklist
 scenes/                 # minimal scenes; UI is built in code
 scripts/game_state.gd   # autoload: question bank, battles, modes, i18n, save data
 scripts/main_menu.gd    # boss select, game modes, language picker
@@ -112,8 +121,15 @@ scripts/battle.gd       # boss battle loop, combo, requeue, results
 scripts/battle_rules.gd # pure boss-battle rules (unit-tested)
 scripts/mode_rules.gd   # pure mode rules: Survival, Points Decay, Save the Pet
 scripts/mode_battle.gd  # run loop for the extra game modes
+scripts/custom_quiz.gd  # custom quiz set creation, paste/load, single-question add
+scripts/quiz_import.gd  # pure validation for imported/added questions (unit-tested)
+scripts/leaderboard.gd  # pure local leaderboard ranking rules (unit-tested)
+scripts/leaderboard_screen.gd # leaderboard UI
 scripts/flashcards.gd   # Leitner flashcard review screen
 scripts/review_scheduler.gd # pure Leitner spaced-repetition rules (unit-tested)
 scripts/pet_avatar.gd   # animated cartoon pet renderer for Save the Pet
 scripts/ui_theme.gd     # shared styles (no art assets needed)
+scripts/ui/quiz_question_view.gd # shared question-view UI (battle + extra modes)
+scripts/dev/            # static_audit.py (release-surface audit), check_commit_identity.sh
+.github/workflows/      # ci.yml, pages.yml, release.yml
 ```

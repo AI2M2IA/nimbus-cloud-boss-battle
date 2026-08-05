@@ -115,5 +115,7 @@
   "flashcards.back": "Back to menu",
   "menu.text_smaller": "Smaller text",
   "menu.text_larger": "Larger text",
-  "menu.text_default": "Default text size"
+  "menu.text_default": "Default text size",
+  "run.pet_incomplete_title": "尚未救出",
+  "run.pet_incomplete": "还没答对20题问题就用完了——你的%s还在等待。试试更大的题库吧！"
 }

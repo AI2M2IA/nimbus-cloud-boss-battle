@@ -1,6 +1,8 @@
 extends Control
-class_name PetAvatar
 ## Cartoon pet renderer and reactions for Save the Pet mode.
+## No class_name: callers preload this by path (see main_menu.gd, mode_battle.gd),
+## consistent with the rest of the project's deliberate avoidance of the
+## global script-class cache -- see the note in tests/run_tests.gd.
 
 const PET_IDS := ["cat", "dog", "parrot", "fish", "hamster"]
 const MOOD_IDLE := "idle"

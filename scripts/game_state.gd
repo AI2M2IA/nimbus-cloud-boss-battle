@@ -183,15 +183,36 @@ func get_battle(id: String) -> Dictionary:
 	return BATTLES[0]
 
 
+## Questions sampled from each of domains 1-4 into the Gatekeeper's pool, on
+## top of its own domain-0 questions, so "Cross-domain warm-up" (its own
+## subtitle) is actually true. It used to filter strictly on domain == 0,
+## whose 4-question pool is real intro/fundamentals content but touches none
+## of the four exam domains -- a "cross-domain" boss that was, in practice,
+## the single narrowest fight in the game.
+const GATEKEEPER_SAMPLE_PER_DOMAIN := 2
+
 func questions_for_battle(id: String) -> Array:
 	var battle := get_battle(id)
 	var pool: Array = []
-	for q in questions:
-		if id == "gauntlet":
+	if id == "gauntlet":
+		for q in questions:
 			if q.get("source", "") == "exam":
 				pool.append(q)
-		elif int(q.get("domain", -99)) == int(battle["domain"]):
-			pool.append(q)
+	elif id == "d0":
+		for q in questions:
+			if int(q.get("domain", -99)) == 0:
+				pool.append(q)
+		for d in [1, 2, 3, 4]:
+			var domain_qs: Array = []
+			for q in questions:
+				if int(q.get("domain", -99)) == d:
+					domain_qs.append(q)
+			domain_qs.shuffle()
+			pool.append_array(domain_qs.slice(0, min(GATEKEEPER_SAMPLE_PER_DOMAIN, domain_qs.size())))
+	else:
+		for q in questions:
+			if int(q.get("domain", -99)) == int(battle["domain"]):
+				pool.append(q)
 	pool.shuffle()
 	return pool
 
@@ -283,16 +304,24 @@ func active_set_id() -> String:
 	return id if not get_custom_set(id).is_empty() else ""
 
 
-## Deterministic id from the set name, so re-importing under the same
-## name replaces the set instead of piling up duplicates.
+## Deterministic id from the set name, so re-importing under the same exact
+## name replaces the set instead of piling up duplicates. The ASCII slug is
+## kept as a readable prefix, but uniqueness comes from the hash suffix of
+## the full original (trimmed, not lowercased/stripped) name -- the slug
+## alone isn't unique enough: "My Set!" and "My-Set" used to both collapse to
+## "set-my-set" and silently overwrite each other, and any name with no
+## ASCII letters or digits at all (e.g. one written in a non-Latin script)
+## used to collapse to the single shared id "set-unnamed".
 func _custom_set_id(set_name: String) -> String:
+	var trimmed := set_name.strip_edges()
 	var slug := ""
-	for ch in set_name.strip_edges().to_lower():
+	for ch in trimmed.to_lower():
 		slug += ch if (ch >= "a" and ch <= "z") or (ch >= "0" and ch <= "9") else "-"
 	while slug.contains("--"):
 		slug = slug.replace("--", "-")
 	slug = slug.lstrip("-").rstrip("-")
-	return "set-" + (slug if slug != "" else "unnamed")
+	var suffix := "%08x" % (trimmed.hash() & 0xFFFFFFFF)
+	return "set-" + (slug + "-" if slug != "" else "") + suffix
 
 
 func _write_custom_sets() -> void:
@@ -344,8 +373,11 @@ func _sanitize_custom_sets(raw: Array) -> Array:
 func record_score(player_name: String, mode_key: String, score: int) -> Dictionary:
 	var entry: Dictionary = Leaderboard.make_entry(
 		player_name, mode_key, score, Time.get_datetime_string_from_system(true))
-	leaderboard_entries = Leaderboard.insert_entry(leaderboard_entries, entry)
-	save_data["player_name"] = String(entry["name"])
+	leaderboard_entries = Leaderboard.capped(Leaderboard.insert_entry(leaderboard_entries, entry))
+	# Don't remember the "???" fallback: an empty/unsafe name should prompt
+	# blank again next time, not pre-fill "???" into the field forever.
+	if String(entry["name"]) != Leaderboard.FALLBACK_NAME:
+		save_data["player_name"] = String(entry["name"])
 	_write_save()
 	_write_leaderboard()
 	return entry
@@ -375,7 +407,7 @@ func _load_leaderboard() -> void:
 		return
 	var data = JSON.parse_string(f.get_as_text())
 	if typeof(data) == TYPE_DICTIONARY and typeof(data.get("entries")) == TYPE_ARRAY:
-		leaderboard_entries = Leaderboard.sort_entries(data["entries"])
+		leaderboard_entries = Leaderboard.sort_entries(Leaderboard.sanitize_entries(data["entries"]))
 
 
 ## Languages that actually have a translation file shipped with the game.
@@ -456,7 +488,24 @@ func _load_save() -> void:
 		return
 	var data = JSON.parse_string(f.get_as_text())
 	if typeof(data) == TYPE_DICTIONARY:
-		save_data = data
+		save_data = _sanitize_save(data)
+
+
+## Coerces known nested containers to their expected type so a hand-edited
+## save.json (e.g. "battles": "oops") can't crash a Dictionary/Array-only
+## call site downstream. Scalar fields (xp, lang, text_scale, player_name,
+## active_set) are already coerced at every read site via int()/String()/
+## float(), so this only needs to cover the container fields those coercions
+## don't reach -- the same defense-in-depth custom_sets.json already gets.
+func _sanitize_save(data: Dictionary) -> Dictionary:
+	var out := data.duplicate()
+	for key in ["battles", "modes"]:
+		if typeof(out.get(key)) != TYPE_DICTIONARY:
+			out[key] = {}
+	for key in ["review_cards"]:
+		if typeof(out.get(key)) != TYPE_ARRAY:
+			out[key] = []
+	return out
 
 func _load_flashcards() -> void:
 	var f := FileAccess.open(FLASHCARDS_PATH, FileAccess.READ)

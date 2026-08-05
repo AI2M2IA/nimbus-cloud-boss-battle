@@ -115,5 +115,7 @@
   "flashcards.back": "Back to menu",
   "menu.text_smaller": "Smaller text",
   "menu.text_larger": "Larger text",
-  "menu.text_default": "Default text size"
+  "menu.text_default": "Default text size",
+  "run.pet_incomplete_title": "ابھی تک نہیںں بچایا گیا",
+  "run.pet_incomplete": "20 درست جوابات مکمل ہونے سے پہلے سوالات ختم ہو گئے — آپ کا %s ابھی بھی انتظار کر رہا ہے۔ ایک بڑا سوالات کا سیٹ آزمائیںں!"
 }
