@@ -1,5 +1,8 @@
 extends RefCounted
-class_name ReviewScheduler
+## No class_name: the caller preloads this by path (const ReviewSchedulerScript
+## := preload(...) in flashcards.gd), consistent with the rest of the
+## project's deliberate avoidance of the global script-class cache -- see the
+## note in tests/run_tests.gd.
 
 const ALL_DOMAINS := ""
 
