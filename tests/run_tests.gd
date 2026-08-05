@@ -234,6 +234,32 @@ func _test_question_bank() -> void:
 	check(bad_answers == 0, "every answer key exists in options")
 	check(bad_two == 0, "select_two questions have exactly 2 answers")
 
+	# Regression: the original supplemental batch (vpc-q00..09) had the
+	# correct answer on "A" in all 10 questions, with nothing here to catch
+	# it — a player could learn to guess a fixed letter instead of reading
+	# the question. Guards against the same mistake creeping back in for any
+	# single-answer letter, without demanding perfect balance.
+	var letter_counts := {"A": 0, "B": 0, "C": 0, "D": 0}
+	var single_supplemental := 0
+	for q in qs:
+		if String(q.get("source", "")) != "supplemental":
+			continue
+		if String(q.get("type", "")) != "single":
+			continue
+		single_supplemental += 1
+		var ans: Array = q.get("answers", [])
+		if ans.size() == 1 and letter_counts.has(String(ans[0])):
+			letter_counts[String(ans[0])] += 1
+	var max_share := 0.0
+	if single_supplemental > 0:
+		for letter in letter_counts:
+			max_share = max(max_share, float(letter_counts[letter]) / float(single_supplemental))
+	check(
+		single_supplemental == 0 or max_share <= 0.6,
+		"supplemental answers aren't dominated by one letter (worst share %.0f%% of %d)"
+			% [max_share * 100.0, single_supplemental]
+	)
+
 
 # -------------------------------------------------------------- game state
 
