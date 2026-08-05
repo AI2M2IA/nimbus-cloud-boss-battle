@@ -10,6 +10,16 @@ mkdir -p "$PWD/user-data/home/Library/Application Support"
 export HOME="$PWD/user-data/home"
 LOG="$PWD/user-data/godot.log"
 
+# On a clean clone, .godot/ (the import cache) doesn't exist yet. Most
+# resources tolerate that -- Godot imports them on demand the first time
+# something asks -- but the project-wide default font (gui/theme/custom_font)
+# loads very early, during theme initialization, before that on-demand path
+# kicks in, so a never-imported project failed here with a Parse Error
+# instead of a clean pass *or* a clean, well-labeled failure. Import first,
+# every time, so this script is self-sufficient on a fresh checkout instead
+# of silently depending on CI's separate --import step to paper over it.
+./godot.sh --headless --path . --import >/dev/null 2>&1 || true
+
 # Godot can log a script compile/parse error (e.g. a bare global class_name
 # reference that isn't registered yet) while still returning a non-null
 # scene/instance, so the GDScript-level checks in tests/run_tests.gd can pass
