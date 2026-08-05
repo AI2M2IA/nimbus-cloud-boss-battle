@@ -115,5 +115,7 @@
   "flashcards.back": "Zurück zum Menü",
   "menu.text_smaller": "Kleinerer Text",
   "menu.text_larger": "Größerer Text",
-  "menu.text_default": "Standardgröße"
+  "menu.text_default": "Standardgröße",
+  "run.pet_incomplete_title": "NOCH NICHT GERETTET",
+  "run.pet_incomplete": "Die Fragen sind ausgegangen, bevor 20 richtige Antworten erreicht wurden — dein %s wartet noch. Versuch es mit einem größeren Fragenset!"
 }

@@ -70,12 +70,18 @@ func _ready() -> void:
 	back_row.add_child(back)
 	root.add_child(back_row)
 
-	file_dialog = FileDialog.new()
-	file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-	file_dialog.access = FileDialog.ACCESS_FILESYSTEM
-	file_dialog.filters = PackedStringArray(["*.json ; JSON files"])
-	file_dialog.file_selected.connect(_on_file_selected)
-	add_child(file_dialog)
+	# FileDialog with ACCESS_FILESYSTEM is sandboxed out of local-disk access
+	# on the Web export (Godot's HTML5 builds can't reach the host
+	# filesystem this way) -- only create it, and only show the button that
+	# opens it, on platforms where it actually works. "Paste JSON" below
+	# still works everywhere.
+	if not OS.has_feature("web"):
+		file_dialog = FileDialog.new()
+		file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+		file_dialog.access = FileDialog.ACCESS_FILESYSTEM
+		file_dialog.filters = PackedStringArray(["*.json ; JSON files"])
+		file_dialog.file_selected.connect(_on_file_selected)
+		add_child(file_dialog)
 
 	_refresh_pool_list()
 
@@ -168,12 +174,13 @@ func _make_import_panel() -> PanelContainer:
 	import_name_edit.custom_minimum_size = Vector2(260, 0)
 	name_row.add_child(import_name_edit)
 
-	var load_btn := Button.new()
-	load_btn.text = Game.t("custom.load_file")
-	load_btn.add_theme_font_size_override("font_size", UITheme.fs(14))
-	UITheme.style_button(load_btn, UITheme.PANEL_LIGHT)
-	load_btn.pressed.connect(func() -> void: file_dialog.popup_centered_ratio(0.7))
-	name_row.add_child(load_btn)
+	if not OS.has_feature("web"):
+		var load_btn := Button.new()
+		load_btn.text = Game.t("custom.load_file")
+		load_btn.add_theme_font_size_override("font_size", UITheme.fs(14))
+		UITheme.style_button(load_btn, UITheme.PANEL_LIGHT)
+		load_btn.pressed.connect(func() -> void: file_dialog.popup_centered_ratio(0.7))
+		name_row.add_child(load_btn)
 
 	import_text = TextEdit.new()
 	import_text.placeholder_text = '{"questions": [ ... ]}'
@@ -303,9 +310,13 @@ func _on_add_pressed() -> void:
 	var texts: Array = []
 	for opt_edit in option_edits:
 		texts.append((opt_edit as LineEdit).text)
-	# Timestamp-based id so it never collides with bulk-imported ids.
+	# Timestamp-based id so it never collides with bulk-imported ids,
+	# combined with a monotonic microsecond tick (not just the wall-clock
+	# second) so two adds within the same second don't collide with each
+	# other either -- that used to make the second add fail with a
+	# confusing "duplicate id" error.
 	var question: Dictionary = QuizImport.build_question(
-		"custom-%d" % int(Time.get_unix_time_from_system()),
+		"custom-%d-%d" % [int(Time.get_unix_time_from_system()), Time.get_ticks_usec()],
 		stem_edit.text,
 		texts,
 		Array(answers_edit.text.split(",", false)),

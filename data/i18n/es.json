@@ -115,5 +115,7 @@
   "flashcards.back": "Volver al menú",
   "menu.text_smaller": "Texto más pequeño",
   "menu.text_larger": "Texto más grande",
-  "menu.text_default": "Tamaño normal"
+  "menu.text_default": "Tamaño normal",
+  "run.pet_incomplete_title": "AÚN NO A SALVO",
+  "run.pet_incomplete": "Se acabaron las preguntas antes de llegar a 20 aciertos — tu %s todavía está esperando. ¡Prueba con un conjunto de preguntas más grande!"
 }
