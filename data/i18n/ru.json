@@ -115,5 +115,7 @@
   "flashcards.back": "Back to menu",
   "menu.text_smaller": "Smaller text",
   "menu.text_larger": "Larger text",
-  "menu.text_default": "Default text size"
+  "menu.text_default": "Default text size",
+  "run.pet_incomplete_title": "ЕЩЁ НЕ СПАСЁН",
+  "run.pet_incomplete": "Вопросы закончились раньше, чем набралось 20 правильных ответов — твой %s всё ещё ждёт. Попробуй набор вопросов побольше!"
 }

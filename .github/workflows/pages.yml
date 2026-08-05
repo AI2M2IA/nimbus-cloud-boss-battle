@@ -28,6 +28,14 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     env:
       GODOT_VERSION: "4.6.3"
+      # Verified sha256 of both assets below (computed from a direct download
+      # of the same release). Pinned rather than trusted blindly: this editor
+      # binary compiles the Web build published to Pages, so an unverified
+      # download is a real supply-chain risk. Bump deliberately when
+      # GODOT_VERSION changes -- download the new assets, inspect them,
+      # compute their sha256.
+      GODOT_ZIP_SHA256: "d0bc2113065e481c9c2c2b2c37daa4e8be3fe9e27f0ab9ab0b6096e9a37907f3"
+      GODOT_TEMPLATES_SHA256: "3fbe2c0e2dec9d537ab9ec97bcf8da91dcf23357fc51f67092dd068d839290a8"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -36,9 +44,11 @@ jobs:
           set -euo pipefail
           base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
           curl -fL -o godot.zip "${base}/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          echo "${GODOT_ZIP_SHA256}  godot.zip" | sha256sum -c -
           unzip -q -o godot.zip
           mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot && chmod +x godot
           curl -fL -o templates.tpz "${base}/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          echo "${GODOT_TEMPLATES_SHA256}  templates.tpz" | sha256sum -c -
           unzip -q -o templates.tpz -d _tpl
           dest="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
           mkdir -p "$dest"

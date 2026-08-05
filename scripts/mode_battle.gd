@@ -11,6 +11,7 @@ const ModeRules := preload("res://scripts/mode_rules.gd")
 const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
 const UITheme := preload("res://scripts/ui_theme.gd")
 const QuizQuestionViewScript := preload("res://scripts/ui/quiz_question_view.gd")
+const ScoreRowScript := preload("res://scripts/ui/score_row.gd")
 
 var mode: Dictionary
 var mode_id: String = "survival"
@@ -153,11 +154,25 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _next_question() -> void:
 	if queue.is_empty():
-		_end_run(true)
+		_handle_queue_exhausted()
 		return
 	current_q = queue.pop_front()
 	question_view.show_question(current_q)
 	_update_hud()
+
+
+## Called whenever the queue runs dry. For Survival/Decay, surviving the
+## whole pool is a legitimate clear -- unchanged. For Save the Pet, running
+## out of questions before reaching the 20-correct goal is NOT a rescue: it
+## used to be treated as an automatic win just because the queue emptied,
+## which is only reachable with a custom set smaller than the goal (the
+## built-in 108-question pool always resolves win/lose well before it could
+## run dry, since 20 + 3 - 1 is far under 108).
+func _handle_queue_exhausted() -> void:
+	if mode_id == "pet" and _run_outcome() == "ongoing":
+		_end_run(false, true)
+	else:
+		_end_run(true)
 
 
 func _on_answer_submitted(chosen: Array) -> void:
@@ -215,8 +230,11 @@ func _on_continue_pressed() -> void:
 	if outcome == "lost":
 		_end_run(false)
 		return
-	if outcome == "saved" or queue.is_empty():
+	if outcome == "saved":
 		_end_run(true)
+		return
+	if queue.is_empty():
+		_handle_queue_exhausted()
 		return
 	_next_question()
 
@@ -251,8 +269,17 @@ func _status_text() -> String:
 
 # ---------------------------------------------------------------- end screen
 
-func _end_run(victory: bool) -> void:
-	Game.record_mode_result(mode_id, correct_count, xp_earned)
+## incomplete is only ever true for Save the Pet, when the question pool ran
+## out before the 20-correct goal was reached (see _handle_queue_exhausted).
+## It's a distinct third outcome from victory/defeat: not a loss (no wrong-
+## answer threshold was hit), but not a rescue either.
+func _end_run(victory: bool, incomplete: bool = false) -> void:
+	# Record the same metric the leaderboard ranks this mode by (points for
+	# Decay, best streak for Pet, correct_count otherwise -- see
+	# _leaderboard_score) rather than always correct_count, so the "best
+	# score" on the menu card and the number that actually ranks you on the
+	# leaderboard are the same run stat instead of two different ones.
+	Game.record_mode_result(mode_id, _leaderboard_score(), xp_earned)
 
 	var overlay := Control.new()
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -277,15 +304,17 @@ func _end_run(victory: bool) -> void:
 	panel.add_child(box)
 
 	var title_text: String
-	if mode_id == "pet":
+	if incomplete:
+		title_text = Game.t("run.pet_incomplete_title")
+	elif mode_id == "pet":
 		title_text = Game.t("run.pet_saved_title") if victory else Game.t("run.pet_lost_title")
 	else:
 		title_text = Game.t("run.cleared_title") if victory else Game.t("run.over_title")
-	var title := UITheme.label(title_text, 32, UITheme.GOOD if victory else UITheme.BAD)
+	var title := UITheme.label(title_text, 32, UITheme.TEXT_DIM if incomplete else (UITheme.GOOD if victory else UITheme.BAD))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 
-	var reason := _reason_text(victory)
+	var reason := _reason_text(victory, incomplete)
 	if reason != "":
 		var sub := UITheme.label(reason, 15, UITheme.TEXT_DIM)
 		sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -306,7 +335,7 @@ func _end_run(victory: bool) -> void:
 	box.add_child(UITheme.label(Game.t("battle.xp_earned") % xp_earned, 16, UITheme.ACCENT))
 	box.add_child(UITheme.label(Game.t("battle.total_xp") % [Game.total_xp(), Game.player_rank()], 14, UITheme.TEXT_DIM))
 
-	box.add_child(_make_score_row(_leaderboard_score()))
+	box.add_child(ScoreRowScript.build(mode_id, _leaderboard_score()))
 
 	var buttons := HBoxContainer.new()
 	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -328,7 +357,9 @@ func _end_run(victory: bool) -> void:
 	buttons.add_child(menu)
 
 
-func _reason_text(victory: bool) -> String:
+func _reason_text(victory: bool, incomplete: bool = false) -> String:
+	if incomplete:
+		return Game.t("run.pet_incomplete") % Game.t("pet.%s" % pet)
 	match mode_id:
 		"pet":
 			var pet_name: String = Game.t("pet.%s" % pet)
@@ -348,38 +379,3 @@ func _leaderboard_score() -> int:
 			return best_streak
 		_:
 			return correct_count
-
-
-## Name prompt + save button so the run can be recorded on the leaderboard.
-func _make_score_row(score: int) -> VBoxContainer:
-	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 6)
-	var hint := UITheme.label(Game.t("lb.record_score") % score, 14, UITheme.TEXT_DIM)
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	col.add_child(hint)
-
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 8)
-	col.add_child(row)
-
-	var name_edit := LineEdit.new()
-	name_edit.placeholder_text = Game.t("lb.your_name")
-	name_edit.text = Game.last_player_name()
-	name_edit.max_length = 12
-	name_edit.custom_minimum_size = Vector2(180, 0)
-	row.add_child(name_edit)
-
-	var save_btn := Button.new()
-	save_btn.text = Game.t("lb.save_score")
-	save_btn.add_theme_font_size_override("font_size", UITheme.fs(14))
-	UITheme.style_button(save_btn, UITheme.ACCENT.darkened(0.3))
-	var on_save := func() -> void:
-		Game.record_score(name_edit.text, mode_id, score)
-		save_btn.disabled = true
-		name_edit.editable = false
-		hint.text = Game.t("lb.saved")
-		hint.add_theme_color_override("font_color", UITheme.GOOD)
-	save_btn.pressed.connect(on_save)
-	row.add_child(save_btn)
-	return col

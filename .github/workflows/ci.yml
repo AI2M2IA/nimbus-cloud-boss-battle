@@ -24,6 +24,14 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GODOT_VERSION: "4.6.3"
+      # Verified sha256 of the editor zip below (computed from a direct
+      # download of the same release asset). Pinned rather than trusted
+      # blindly: this binary imports assets and runs the test suite in CI,
+      # so an unverified download is a supply-chain risk on the exact same
+      # footing as the rcodesign pin in release.yml. Bump deliberately when
+      # GODOT_VERSION changes -- download the new asset, inspect it, compute
+      # its sha256.
+      GODOT_ZIP_SHA256: "d0bc2113065e481c9c2c2b2c37daa4e8be3fe9e27f0ab9ab0b6096e9a37907f3"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -59,6 +67,7 @@ jobs:
           mkdir -p ~/godot && cd ~/godot
           base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
           curl -fL -o godot.zip "${base}/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          echo "${GODOT_ZIP_SHA256}  godot.zip" | sha256sum -c -
           unzip -o godot.zip
           mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot
           chmod +x godot

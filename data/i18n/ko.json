@@ -115,5 +115,7 @@
   "flashcards.back": "Back to menu",
   "menu.text_smaller": "Smaller text",
   "menu.text_larger": "Larger text",
-  "menu.text_default": "Default text size"
+  "menu.text_default": "Default text size",
+  "run.pet_incomplete_title": "아직 구하지 못했어요",
+  "run.pet_incomplete": "정답 20개를 채우기 전에 문제가 떨어졌어요 — %s가 아직 기다리고 있어요. 더 큰 문제 세트를 시도해보세요!"
 }

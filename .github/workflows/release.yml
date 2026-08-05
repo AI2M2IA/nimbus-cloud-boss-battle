@@ -22,6 +22,14 @@ jobs:
     env:
       GODOT_VERSION: "4.6.3"
       GAME: NimbusCloudBossBattle
+      # Verified sha256 of both Godot assets below, same rationale as the
+      # rcodesign pin further down: this editor binary compiles every
+      # published release artifact (Web + all desktop platforms), so an
+      # unverified download is a supply-chain risk on the exact same footing.
+      # Bump deliberately when GODOT_VERSION changes -- download the new
+      # assets, inspect them, compute their sha256.
+      GODOT_ZIP_SHA256: "d0bc2113065e481c9c2c2b2c37daa4e8be3fe9e27f0ab9ab0b6096e9a37907f3"
+      GODOT_TEMPLATES_SHA256: "3fbe2c0e2dec9d537ab9ec97bcf8da91dcf23357fc51f67092dd068d839290a8"
       # Pinned rcodesign (apple-codesign) release + its verified sha256 — see
       # the signing step below for why this isn't resolved dynamically.
       RCODESIGN_VERSION: "0.29.0"
@@ -34,9 +42,11 @@ jobs:
           set -euo pipefail
           base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
           curl -fL -o godot.zip "${base}/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          echo "${GODOT_ZIP_SHA256}  godot.zip" | sha256sum -c -
           unzip -q -o godot.zip
           mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot && chmod +x godot
           curl -fL -o templates.tpz "${base}/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          echo "${GODOT_TEMPLATES_SHA256}  templates.tpz" | sha256sum -c -
           unzip -q -o templates.tpz -d _tpl
           dest="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
           mkdir -p "$dest"
