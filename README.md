@@ -105,12 +105,20 @@ You can also pass raw Godot arguments through the shortcut, for example `./godot
 
 Most of `data/questions.json` mirrors `docs/api/questions.json` from the book site (the `"chapter"` and `"exam"` sourced entries); a small set of supplemental questions is also included, tagged `"source": "supplemental"`. To sync the book-sourced content after an upstream edit, replace just the `"chapter"`/`"exam"` entries — the game reads the whole file at startup either way, nothing else to change.
 
+The file also carries a small `generatedAt`/`contentHash`/`counts` metadata block above the `questions` array, for humans skimming the raw file — nothing at runtime reads it. After adding, removing, or moving questions by hand, refresh it with:
+
+```
+python3 data/build_question_stats.py
+```
+
+`tests/run_tests.gd` checks that block against the real array and fails if it's stale.
+
 ## Project layout
 
 ```
 project.godot           # Godot 4 config (GL Compatibility renderer — web-friendly)
 godot.sh                # local Godot shortcut; no args runs this project
-data/questions.json     # question bank (108 questions, SAA-C03 domains)
+data/questions.json     # question bank (123 questions, SAA-C03 domains)
 data/flashcards.json    # 186 Leitner flashcards (from the book)
 data/i18n/              # UI translations (en.json fallback, pt-BR.json, ...)
 docs/                   # roadmap, release checklist
