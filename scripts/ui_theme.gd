@@ -1,5 +1,10 @@
-class_name UITheme
 ## Shared UI helpers (styleboxes, colors) built in code — no art assets needed.
+## No class_name: every caller preloads this by path (const UITheme :=
+## preload("res://scripts/ui_theme.gd")), same as the rest of the project's
+## deliberate avoidance of the global script-class cache -- see the note in
+## tests/run_tests.gd. A class_name here was dead weight (nothing referenced
+## the global name) and reintroduced the exact hazard the rest of the code
+## works around.
 
 const BG := Color("#101627")
 const PANEL := Color("#1b2238")

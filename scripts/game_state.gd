@@ -15,6 +15,7 @@ const TEXT_SCALE_MAX := 1.5
 const TEXT_SCALE_STEP := 0.15
 const CUSTOM_SETS_PATH := "user://custom_sets.json"
 const LEADERBOARD_PATH := "user://leaderboard.json"
+const GATEKEEPER_SAMPLE_PER_DOMAIN := 2
 
 ## Boss names stay in English in every locale (creative proper nouns, same
 ## policy as AWS service names); subtitles are localized via subtitle_key.
@@ -25,7 +26,7 @@ const BATTLES := [
 		"subtitle_key": "boss.d0.sub",
 		"domain": 0,
 		"color": "#9b8cff",
-		"hearts": 3,
+		"hearts": 5,
 	},
 	{
 		"id": "d1",
@@ -229,12 +230,26 @@ func get_battle(id: String) -> Dictionary:
 func questions_for_battle(id: String) -> Array:
 	var battle := get_battle(id)
 	var pool: Array = []
-	for q in questions:
-		if id == "gauntlet":
+	if id == "gauntlet":
+		for q in questions:
 			if q.get("source", "") == "exam":
 				pool.append(q)
-		elif int(q.get("domain", -99)) == int(battle["domain"]):
-			pool.append(q)
+	elif id == "d0":
+		for q in questions:
+			if int(q.get("domain", -99)) == 0:
+				pool.append(q)
+		for domain in [1, 2, 3, 4]:
+			var domain_questions: Array = []
+			for q in questions:
+				if int(q.get("domain", -99)) == domain:
+					domain_questions.append(q)
+			domain_questions.shuffle()
+			pool.append_array(domain_questions.slice(
+				0, min(GATEKEEPER_SAMPLE_PER_DOMAIN, domain_questions.size())))
+	else:
+		for q in questions:
+			if int(q.get("domain", -99)) == int(battle["domain"]):
+				pool.append(q)
 	pool.shuffle()
 	return pool
 
@@ -309,13 +324,14 @@ func _sanitize_set_name(set_name: String) -> String:
 ## Append one validated question to a set, creating the set if needed.
 ## Returns the QuizImport.validate_bank verdict for the resulting set.
 func append_to_custom_set(set_name: String, question: Dictionary) -> Dictionary:
-	var id := _custom_set_id(set_name)
+	var clean_name := _sanitize_set_name(set_name)
+	var id := _custom_set_id(clean_name)
 	var set_data := get_custom_set(id)
 	var qs: Array = (set_data.get("questions", []) as Array).duplicate()
 	qs.append(question)
 	var verdict: Dictionary = QuizImport.validate_bank({"questions": qs})
 	if verdict["ok"]:
-		save_custom_set(set_name if set_data.is_empty() else String(set_data["name"]), qs)
+		save_custom_set(clean_name if set_data.is_empty() else String(set_data["name"]), qs)
 	return verdict
 
 
@@ -343,13 +359,15 @@ func active_set_id() -> String:
 ## Deterministic id from the set name, so re-importing under the same
 ## name replaces the set instead of piling up duplicates.
 func _custom_set_id(set_name: String) -> String:
+	var trimmed := set_name.strip_edges()
 	var slug := ""
-	for ch in set_name.strip_edges().to_lower():
+	for ch in trimmed.to_lower():
 		slug += ch if (ch >= "a" and ch <= "z") or (ch >= "0" and ch <= "9") else "-"
 	while slug.contains("--"):
 		slug = slug.replace("--", "-")
 	slug = slug.lstrip("-").rstrip("-")
-	return "set-" + (slug if slug != "" else "unnamed")
+	var suffix := "%08x" % (trimmed.hash() & 0xFFFFFFFF)
+	return "set-" + (slug + "-" if slug != "" else "") + suffix
 
 
 func _write_custom_sets() -> void:
@@ -400,7 +418,8 @@ func record_score(player_name: String, mode_key: String, score: int) -> Dictiona
 	var entry: Dictionary = Leaderboard.make_entry(
 		player_name, mode_key, score, Time.get_datetime_string_from_system(true))
 	leaderboard_entries = Leaderboard.insert_entry(leaderboard_entries, entry)
-	save_data["player_name"] = String(entry["name"])
+	if String(entry["name"]) != Leaderboard.FALLBACK_NAME:
+		save_data["player_name"] = String(entry["name"])
 	_write_save()
 	_write_leaderboard()
 	return entry
@@ -428,7 +447,7 @@ func _load_leaderboard() -> void:
 		return
 	var data = JSON.parse_string(f.get_as_text())
 	if typeof(data) == TYPE_DICTIONARY and typeof(data.get("entries")) == TYPE_ARRAY:
-		leaderboard_entries = Leaderboard.sort_entries(data["entries"])
+		leaderboard_entries = Leaderboard.sort_entries(Leaderboard.sanitize_entries(data["entries"]))
 
 
 ## Languages that actually have a translation file shipped with the game.

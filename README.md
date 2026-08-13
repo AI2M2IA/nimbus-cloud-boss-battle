@@ -51,6 +51,14 @@ Besides the boss battles, the main menu offers three modes that draw from the fu
 
 All modes keep the combo/XP rules from the boss battles, show every explanation, and record a per-mode best score and attempt count in the save file. Runs that draw from a player-authored custom set are practice only: they award no XP and no leaderboard entry. The thresholds live in `scripts/mode_rules.gd` as pure, unit-tested functions.
 
+## Custom quizzes
+
+The Custom Quiz screen accepts a pasted or local JSON question set (up to 2 MB / 1000 questions), or lets you add questions individually. Both paths apply the same validation and content limits as the shipped bank (`scripts/quiz_import.gd`). An active set replaces the built-in pool for the three extra game modes; boss battles continue to use the official domain bank. Web exports cannot access native files, so use **Paste JSON** in the browser.
+
+## Leaderboard
+
+Finished runs and boss-battle XP can be saved to a ranked, dated, local leaderboard. It lives in `user://leaderboard.json` beside the save file; no account or server is involved. Custom-set practice runs are intentionally excluded.
+
 ## Flashcards (Leitner)
 
 A spaced-repetition study mode over the book's **186 flashcards** (`data/flashcards.json`). Each card shows a term; click it to flip to the definition (with a flip animation), then grade yourself **Got it** or **Again**. "Got it" promotes the card through Leitner boxes (review intervals of 0 / 2 / 5 / 10 days); "Again" sends it back to box 1. Box state persists in the save. The scheduling logic lives in `scripts/review_scheduler.gd` (pure, unit-tested).
@@ -122,10 +130,18 @@ scripts/battle.gd       # boss battle loop, combo, requeue, checkpoints, results
 scripts/battle_rules.gd # pure boss-battle rules (unit-tested)
 scripts/mode_rules.gd   # pure mode rules: Survival, Points Decay, Save the Pet
 scripts/mode_battle.gd  # run loop for the extra game modes
+scripts/custom_quiz.gd  # custom-set creation, paste/load, single-question add
+scripts/quiz_import.gd  # pure import validation and content limits
+scripts/leaderboard.gd  # pure local leaderboard ranking and sanitization
+scripts/leaderboard_screen.gd # local leaderboard UI
 scripts/flashcards.gd   # Leitner flashcard review screen
 scripts/review_scheduler.gd # pure Leitner spaced-repetition rules (unit-tested)
 scripts/pet_avatar.gd   # animated cartoon pet renderer for Save the Pet
 scripts/ui_theme.gd     # shared styles (no art assets needed)
 scripts/ui_fonts.gd     # fallback font chain for the Web export
 scripts/ui/dialog_view.gd # shared modal dialog (resume/leave/abandon)
+scripts/ui/quiz_question_view.gd # shared question UI (boss + extra modes)
+scripts/ui/score_row.gd # shared score-recording UI
+scripts/dev/            # static release audit and identity check
+.github/workflows/      # CI, Pages, and release automation
 ```

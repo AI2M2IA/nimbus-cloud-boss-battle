@@ -71,12 +71,15 @@ func _ready() -> void:
 	back_row.add_child(back)
 	root.add_child(back_row)
 
-	file_dialog = FileDialog.new()
-	file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-	file_dialog.access = FileDialog.ACCESS_FILESYSTEM
-	file_dialog.filters = PackedStringArray(["*.json ; JSON files"])
-	file_dialog.file_selected.connect(_on_file_selected)
-	add_child(file_dialog)
+	# Native filesystem access is unavailable in Web exports; paste import
+	# remains available there and the file button is hidden separately.
+	if not OS.has_feature("web"):
+		file_dialog = FileDialog.new()
+		file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+		file_dialog.access = FileDialog.ACCESS_FILESYSTEM
+		file_dialog.filters = PackedStringArray(["*.json ; JSON files"])
+		file_dialog.file_selected.connect(_on_file_selected)
+		add_child(file_dialog)
 
 	_refresh_pool_list()
 
@@ -314,9 +317,10 @@ func _on_add_pressed() -> void:
 	var texts: Array = []
 	for opt_edit in option_edits:
 		texts.append((opt_edit as LineEdit).text)
-	# Timestamp-based id so it never collides with bulk-imported ids.
+	# Combine wall-clock time with a monotonic microsecond tick so rapid adds
+	# cannot collide with each other or with bulk-imported ids.
 	var question: Dictionary = QuizImport.build_question(
-		"custom-%d" % int(Time.get_unix_time_from_system()),
+		"custom-%d-%d" % [int(Time.get_unix_time_from_system()), Time.get_ticks_usec()],
 		stem_edit.text,
 		texts,
 		Array(answers_edit.text.split(",", false)),

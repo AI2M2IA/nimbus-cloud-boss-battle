@@ -12,6 +12,7 @@ const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
 const UITheme := preload("res://scripts/ui_theme.gd")
 const QuizQuestionViewScript := preload("res://scripts/ui/quiz_question_view.gd")
 const DialogView := preload("res://scripts/ui/dialog_view.gd")
+const ScoreRowScript := preload("res://scripts/ui/score_row.gd")
 
 var mode: Dictionary
 var mode_id: String = "survival"
@@ -340,7 +341,7 @@ func _end_run(victory: bool) -> void:
 	_ended = true
 	# Custom-set runs are practice, not progression: no XP, no leaderboard,
 	# so a tiny hand-made pool can't be farmed for ranks.
-	Game.record_mode_result(mode_id, correct_count, 0 if custom_pool else xp_earned)
+	Game.record_mode_result(mode_id, _leaderboard_score(), 0 if custom_pool else xp_earned)
 
 	var overlay := Control.new()
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -398,7 +399,7 @@ func _end_run(victory: bool) -> void:
 	box.add_child(UITheme.label(Game.t("battle.total_xp") % [Game.total_xp(), Game.player_rank()], 14, UITheme.TEXT_DIM))
 
 	if not custom_pool:
-		box.add_child(_make_score_row(_leaderboard_score()))
+		box.add_child(ScoreRowScript.build(mode_id, _leaderboard_score()))
 
 	var buttons := HBoxContainer.new()
 	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -443,38 +444,3 @@ func _leaderboard_score() -> int:
 			return best_streak
 		_:
 			return correct_count
-
-
-## Name prompt + save button so the run can be recorded on the leaderboard.
-func _make_score_row(score: int) -> VBoxContainer:
-	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 6)
-	var hint := UITheme.label(Game.t("lb.record_score") % score, 14, UITheme.TEXT_DIM)
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	col.add_child(hint)
-
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 8)
-	col.add_child(row)
-
-	var name_edit := LineEdit.new()
-	name_edit.placeholder_text = Game.t("lb.your_name")
-	name_edit.text = Game.last_player_name()
-	name_edit.max_length = 12
-	name_edit.custom_minimum_size = Vector2(180, 0)
-	row.add_child(name_edit)
-
-	var save_btn := Button.new()
-	save_btn.text = Game.t("lb.save_score")
-	save_btn.add_theme_font_size_override("font_size", UITheme.fs(14))
-	UITheme.style_button(save_btn, UITheme.ACCENT.darkened(0.4))
-	var on_save := func() -> void:
-		Game.record_score(name_edit.text, mode_id, score)
-		save_btn.disabled = true
-		name_edit.editable = false
-		hint.text = Game.t("lb.saved")
-		hint.add_theme_color_override("font_color", UITheme.GOOD)
-	save_btn.pressed.connect(on_save)
-	row.add_child(save_btn)
-	return col

@@ -67,6 +67,7 @@ func _initialize() -> void:
 	_test_scene_smoke()
 	await _test_overflow_hint()
 	await _test_select_two_keyboard()
+	await _test_retreat_confirmation()
 	print("--------------------------------------------------")
 	print("%d checks, %d failure(s)" % [checks, failures])
 	quit(1 if failures > 0 else 0)
@@ -395,6 +396,15 @@ func _test_game_state() -> void:
 				if String(q.get("source", "")) != "exam":
 					only_exam = false
 			check(only_exam, "gauntlet uses exam questions only")
+		elif id == "d0":
+			# Regression: this used to filter strictly on domain == 0 (a
+			# 4-question pool) despite being billed as "Cross-domain warm-up".
+			var domains_seen := {}
+			for q in pool:
+				domains_seen[int(q.get("domain", -99))] = true
+			check(domains_seen.has(0), "Gatekeeper pool still includes its own domain-0 questions")
+			for d in [1, 2, 3, 4]:
+				check(domains_seen.has(d), "Gatekeeper pool includes domain %d (actually cross-domain now)" % d)
 		else:
 			var dom := int(b["domain"])
 			var only_dom := true
@@ -687,6 +697,13 @@ func _test_custom_sets() -> void:
 	var kept := gs._sanitize_custom_sets([{"id": "keep", "name": "Keep", "questions": [keepq]}])
 	check(kept.size() == 1 and kept[0]["id"] == "keep", "load keeps a set whose questions validate")
 	check(gs._sanitize_custom_sets([{"id": "bad", "name": "Bad", "questions": [{"id": "x"}]}]).is_empty(), "load drops a set with invalid questions")
+	# Regression: the ASCII-only slug used to collapse different names to the
+	# same id and silently overwrite each other -- both a punctuation-only
+	# difference and, worse, any pair of non-Latin names (which used to both
+	# collapse all the way down to the single shared id "set-unnamed").
+	check(gs._custom_set_id("My Set!") != gs._custom_set_id("My-Set"), "different names no longer collide on the same id")
+	check(gs._custom_set_id("日本語のセット") != gs._custom_set_id("另一个套装"), "two non-Latin names no longer both collapse to set-unnamed")
+	check(gs._custom_set_id("My Set") == gs._custom_set_id("My Set"), "the exact same name is still deterministic (re-import replaces)")
 	gs.free()
 	_restore_file(GameState.CUSTOM_SETS_PATH, snap_sets)
 	_restore_file(GameState.SAVE_PATH, snap_save)
@@ -963,3 +980,46 @@ func _press_key(node, keycode: int) -> void:
 	event.keycode = keycode
 	event.pressed = true
 	node._unhandled_input(event)
+
+
+# ------------------------------------------------------- retreat confirmation
+
+## "Leave" and Esc must not discard an in-progress battle/run without
+## confirmation. Both paths should create the shared modal dialog instead of
+## changing scene directly. Only the gating is exercised here -- confirming
+## would change this suite's own SceneTree.
+func _test_retreat_confirmation() -> void:
+	print("[retreat_confirmation]")
+	await _check_retreat_confirmation_for_scene("res://scenes/battle.tscn")
+	await _check_retreat_confirmation_for_scene("res://scenes/mode_battle.tscn")
+
+
+func _check_retreat_confirmation_for_scene(scene_path: String) -> void:
+	var packed: PackedScene = load(scene_path)
+	var instance = packed.instantiate()
+	root.add_child(instance)
+	await process_frame
+	await process_frame
+
+	check(instance.dialog == null, "%s: confirmation dialog starts closed" % scene_path)
+
+	# Call the same handler as the visible leave/abandon button rather than
+	# searching the code-built UI tree for that button.
+	if scene_path.ends_with("battle.tscn") and not scene_path.ends_with("mode_battle.tscn"):
+		instance._show_leave_dialog()
+	else:
+		instance._show_abandon_dialog()
+	await process_frame
+	var dialog = instance.dialog
+	check(is_instance_valid(dialog) and dialog.visible,
+		"%s: leave button opens the confirmation dialog instead of leaving immediately" % scene_path)
+
+	instance._close_dialog()
+	await process_frame
+	_press_key(instance, KEY_ESCAPE)
+	await process_frame
+	dialog = instance.dialog
+	check(is_instance_valid(dialog) and dialog.visible,
+		"%s: Esc also opens the confirmation dialog instead of leaving immediately" % scene_path)
+
+	instance.queue_free()

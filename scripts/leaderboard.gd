@@ -92,3 +92,24 @@ static func top_for_mode(entries: Array, mode: String, n: int = DEFAULT_TOP_N) -
 			filtered.append(e)
 	var ranked := sort_entries(filtered)
 	return ranked.slice(0, max(n, 0))
+
+
+## Rebuild raw persisted entries into the safe, expected shape. This keeps a
+## hand-edited leaderboard from injecting unsafe names or malformed modes.
+static func sanitize_entries(entries: Array) -> Array:
+	var out: Array = []
+	for entry in entries:
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var mode := String(entry.get("mode", ""))
+		if not MODES.has(mode):
+			continue
+		var raw_score = entry.get("score", 0)
+		var score := int(raw_score) if (typeof(raw_score) == TYPE_INT or typeof(raw_score) == TYPE_FLOAT) else 0
+		out.append({
+			"name": sanitize_name(String(entry.get("name", ""))),
+			"mode": mode,
+			"score": score,
+			"date": String(entry.get("date", "")),
+		})
+	return out

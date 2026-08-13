@@ -25,10 +25,10 @@ Instructions for any AI agent (and any human contributor) working in this reposi
 Godot 4.6, GDScript. Keep pure game logic in RefCounted modules with static functions (see `scripts/battle_rules.gd`, `scripts/mode_rules.gd`) so it stays unit-testable independently of UI. Run the headless test suite before committing logic changes:
 
 ```
-godot --headless --path . -s tests/run_tests.gd
+./run-tests.sh
 ```
 
-(Exits 0 on success, 1 on failure — CI-friendly.)
+Don't call `godot --headless --path . -s tests/run_tests.gd` directly. The wrapper does three things a bare invocation skips: imports assets first (required on a clean checkout — the project-wide default font loads before Godot's on-demand import path kicks in, so a never-imported project fails with a Parse Error instead of running), isolates `HOME` so the run doesn't touch your real Godot editor settings, and greps the run's own log for script compile/parse errors that Godot's exit code alone doesn't always catch. Exits 0 on success, 1 on failure — CI-friendly.
 
 ## Localization
 

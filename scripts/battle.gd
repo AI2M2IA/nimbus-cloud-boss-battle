@@ -6,6 +6,7 @@ const Rules := preload("res://scripts/battle_rules.gd")
 const UITheme := preload("res://scripts/ui_theme.gd")
 const QuizQuestionViewScript := preload("res://scripts/ui/quiz_question_view.gd")
 const DialogView := preload("res://scripts/ui/dialog_view.gd")
+const ScoreRowScript := preload("res://scripts/ui/score_row.gd")
 const VICTORY_BONUS := 500
 
 var battle: Dictionary
@@ -253,7 +254,9 @@ func _animate_boss_hit(damage_xp: int) -> void:
 func _update_hud() -> void:
 	var remaining := total_unique - correct_done
 	boss_hp_label.text = Game.t("battle.boss_hp") % [remaining, total_unique]
-	progress_label.text = Game.t("battle.progress") % [questions_seen, queue.size() + (0 if current_q.is_empty() else 1)]
+	# `current_q` is already present in queue immediately after a wrong answer,
+	# so counting both briefly inflated the remaining-question indicator.
+	progress_label.text = Game.t("battle.progress") % [questions_seen, remaining]
 	streak_label.text = Game.t("battle.combo") % [streak, best_streak]
 	xp_label.text = Game.t("battle.xp") % xp_earned
 	var i := 0
@@ -450,7 +453,7 @@ func _end_battle(victory: bool) -> void:
 		tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		box.add_child(tip)
 
-	box.add_child(_make_score_row(xp_earned))
+	box.add_child(ScoreRowScript.build("boss", xp_earned))
 
 	var buttons := HBoxContainer.new()
 	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -470,38 +473,3 @@ func _end_battle(victory: bool) -> void:
 	UITheme.style_button(menu, UITheme.PANEL_LIGHT)
 	menu.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
 	buttons.add_child(menu)
-
-
-## Name prompt + save button — boss battles rank by XP earned ("boss" board).
-func _make_score_row(score: int) -> VBoxContainer:
-	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 6)
-	var hint := UITheme.label(Game.t("lb.record_score") % score, 14, UITheme.TEXT_DIM)
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	col.add_child(hint)
-
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 8)
-	col.add_child(row)
-
-	var name_edit := LineEdit.new()
-	name_edit.placeholder_text = Game.t("lb.your_name")
-	name_edit.text = Game.last_player_name()
-	name_edit.max_length = 12
-	name_edit.custom_minimum_size = Vector2(180, 0)
-	row.add_child(name_edit)
-
-	var save_btn := Button.new()
-	save_btn.text = Game.t("lb.save_score")
-	save_btn.add_theme_font_size_override("font_size", UITheme.fs(14))
-	UITheme.style_button(save_btn, UITheme.ACCENT.darkened(0.4))
-	var on_save := func() -> void:
-		Game.record_score(name_edit.text, "boss", score)
-		save_btn.disabled = true
-		name_edit.editable = false
-		hint.text = Game.t("lb.saved")
-		hint.add_theme_color_override("font_color", UITheme.GOOD)
-	save_btn.pressed.connect(on_save)
-	row.add_child(save_btn)
-	return col
