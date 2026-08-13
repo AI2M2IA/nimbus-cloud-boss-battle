@@ -23,6 +23,7 @@ var _again_btn: Button
 
 
 func _ready() -> void:
+	Game.setup_scene_root(self)
 	_rs = ReviewSchedulerScript.new()
 	for fc in Game.flashcards:
 		_by_id[String(fc.get("id", ""))] = fc
@@ -157,3 +158,10 @@ func _on_grade(success: bool) -> void:
 
 func _on_back() -> void:
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.is_echo():
+		if (event as InputEventKey).keycode == KEY_ESCAPE:
+			_on_back()
+			get_viewport().set_input_as_handled()

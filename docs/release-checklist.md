@@ -19,7 +19,7 @@ git config user.name && git config user.email
 - The only valid author and committer identity is:
 
 ```text
-AI(2)M(2)IA <AI2M2IA@users.noreply.github.com>
+AI(2)M(2)IA <286691643+AI2M2IA@users.noreply.github.com>
 ```
 
 - After committing, verify the last commit metadata:

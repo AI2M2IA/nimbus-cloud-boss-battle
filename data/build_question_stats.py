@@ -21,10 +21,15 @@ exactly -- only the metadata block at the top is touched.
 
 import hashlib
 import json
+import os
 import sys
+import tempfile
 from datetime import datetime, timezone
+from pathlib import Path
 
-PATH = "data/questions.json"
+# Resolved from the script's own location so the script works from any
+# working directory, not just the repo root.
+PATH = Path(__file__).resolve().parent / "questions.json"
 
 
 def compute_counts(questions):
@@ -79,8 +84,19 @@ def main():
         "questions": questions,
     }
 
-    with open(PATH, "w", encoding="utf-8") as f:
-        f.write(json.dumps(ordered, ensure_ascii=False, separators=(",", ":")))
+    # Atomic write: write to a temp file in the same directory, then
+    # os.replace, so a crash mid-write can't leave a truncated questions.json.
+    fd, tmp_name = tempfile.mkstemp(dir=PATH.parent, prefix=f".{PATH.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(json.dumps(ordered, ensure_ascii=False, separators=(",", ":")))
+        os.replace(tmp_name, PATH)
+    except BaseException:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
 
     print(f"counts: {data['counts']}")
     print(f"contentHash: {data['contentHash']}")

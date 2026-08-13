@@ -5,6 +5,7 @@ extends Control
 const Rules := preload("res://scripts/battle_rules.gd")
 const UITheme := preload("res://scripts/ui_theme.gd")
 const QuizQuestionViewScript := preload("res://scripts/ui/quiz_question_view.gd")
+const DialogView := preload("res://scripts/ui/dialog_view.gd")
 const ScoreRowScript := preload("res://scripts/ui/score_row.gd")
 const VICTORY_BONUS := 500
 
@@ -36,20 +37,42 @@ var question_view  # QuizQuestionViewScript instance; untyped like pet_avatar
 # in mode_battle.gd, so calling show_question()/show_result() doesn't depend
 # on a class_name being registered in the global script class cache.
 var overlay: Control
-var retreat_dialog: ConfirmationDialog
+var dialog: Control = null
+## Safe action for Esc while a dialog is open (STAY for the leave dialog,
+## BACK TO MENU for the resume dialog) — Esc was inert while a dialog was
+## up, which stranded keyboard-only players in the decision screen.
+var dialog_cancel: Callable = func() -> void: pass
+## Set by _end_battle so end-of-battle logic (record_result, overlay) runs
+## exactly once -- the quiz view keeps answered == true under the overlay,
+## so Enter/Space would otherwise re-emit continue_requested forever.
+var _ended: bool = false
 
 
 func _ready() -> void:
+	Game.setup_scene_root(self)
 	battle = Game.get_battle(Game.selected_battle_id)
 	boss_color = Color(String(battle["color"]))
-	queue = Game.questions_for_battle(String(battle["id"]))
-	total_unique = queue.size()
 	max_hearts = int(battle["hearts"])
 	hearts = max_hearts
 
+	var checkpoint: Dictionary = Game.battle_checkpoint(String(battle["id"]))
+	if checkpoint.is_empty():
+		queue = Game.questions_for_battle(String(battle["id"]))
+		total_unique = queue.size()
+		if queue.is_empty():
+			# Empty pool (e.g. questions.json failed to load): show an error
+			# instead of falling into _next_question's free instant victory.
+			_build_pool_error()
+			return
+		_build_ui()
+		_update_hud()
+		_next_question()
+		return
+
+	_restore_checkpoint(checkpoint)
 	_build_ui()
 	_update_hud()
-	_next_question()
+	_show_resume_dialog(checkpoint)
 
 
 # ---------------------------------------------------------------- UI building
@@ -83,13 +106,13 @@ func _build_ui() -> void:
 
 	boss_name_label = UITheme.label(String(battle["boss"]), 26, boss_color)
 	boss_box.add_child(boss_name_label)
-	boss_box.add_child(UITheme.label(String(battle["subtitle"]), 13, UITheme.TEXT_DIM))
+	boss_box.add_child(UITheme.label(Game.t(String(battle["subtitle_key"])), 13, UITheme.TEXT_DIM))
 
 	boss_hp_bar = ProgressBar.new()
 	boss_hp_bar.show_percentage = false
 	boss_hp_bar.custom_minimum_size = Vector2(0, 18)
 	boss_hp_bar.max_value = total_unique
-	boss_hp_bar.value = total_unique
+	boss_hp_bar.value = total_unique - correct_done
 	boss_hp_bar.add_theme_stylebox_override("background", UITheme.panel_box(UITheme.PANEL_LIGHT, 6, 2))
 	boss_hp_bar.add_theme_stylebox_override("fill", UITheme.panel_box(boss_color, 6, 2))
 	boss_box.add_child(boss_hp_bar)
@@ -130,31 +153,19 @@ func _build_ui() -> void:
 	quit.text = Game.t("battle.retreat")
 	quit.flat = true
 	quit.add_theme_color_override("font_color", UITheme.TEXT_DIM)
-	quit.pressed.connect(_confirm_retreat)
+	quit.pressed.connect(_on_retreat_pressed)
 	root.add_child(quit)
-
-	# A battle can run 30+ questions (the Gauntlet is 65); leaving mid-run
-	# forfeits all of it, since progress is only recorded in _end_battle().
-	# Gate the retreat link and Esc behind a confirmation so that isn't one
-	# accidental click/keypress away.
-	retreat_dialog = ConfirmationDialog.new()
-	retreat_dialog.title = Game.t("battle.retreat_confirm_title")
-	retreat_dialog.dialog_text = Game.t("battle.retreat_confirm_body")
-	retreat_dialog.ok_button_text = Game.t("battle.retreat_confirm_ok")
-	retreat_dialog.cancel_button_text = Game.t("battle.retreat_confirm_cancel")
-	retreat_dialog.confirmed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
-	add_child(retreat_dialog)
-
-
-func _confirm_retreat() -> void:
-	if not retreat_dialog.visible:
-		retreat_dialog.popup_centered()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.is_echo():
 		if (event as InputEventKey).keycode == KEY_ESCAPE:
-			_confirm_retreat()
+			if dialog != null:
+				var cancel := dialog_cancel
+				_close_dialog()
+				cancel.call()
+			else:
+				_on_retreat_pressed()
 			get_viewport().set_input_as_handled()
 
 
@@ -210,9 +221,12 @@ func _on_answer_submitted(chosen: Array) -> void:
 	var explanation := String(current_q.get("explanation", Game.t("battle.no_explanation")))
 	question_view.show_result(chosen, answers, verdict_text, verdict_color, explanation)
 	_update_hud()
+	_write_checkpoint()
 
 
 func _on_continue_pressed() -> void:
+	if _ended or dialog != null:
+		return
 	if hearts <= 0:
 		_end_battle(false)
 		return
@@ -240,13 +254,8 @@ func _animate_boss_hit(damage_xp: int) -> void:
 func _update_hud() -> void:
 	var remaining := total_unique - correct_done
 	boss_hp_label.text = Game.t("battle.boss_hp") % [remaining, total_unique]
-	# Was `queue.size() + (0 if current_q.is_empty() else 1)`: right after a
-	# wrong answer, _on_answer_submitted() has already reinserted current_q
-	# into queue (for the requeue), so that expression counted it twice --
-	# once via current_q, once via the copy already sitting in queue -- until
-	# the next _next_question() call rebalanced it. `remaining` is already
-	# the correct, requeue-timing-independent count (see boss_hp_label above)
-	# so reuse it here instead of re-deriving a second, buggier one.
+	# `current_q` is already present in queue immediately after a wrong answer,
+	# so counting both briefly inflated the remaining-question indicator.
 	progress_label.text = Game.t("battle.progress") % [questions_seen, remaining]
 	streak_label.text = Game.t("battle.combo") % [streak, best_streak]
 	xp_label.text = Game.t("battle.xp") % xp_earned
@@ -260,9 +269,140 @@ func _update_hud() -> void:
 		i += 1
 
 
+# ------------------------------------------------------- checkpoint + dialogs
+
+## Restore a validated checkpoint (Game.battle_checkpoint) before _build_ui:
+## queue order, hearts, streak and counters come back exactly as saved.
+func _restore_checkpoint(checkpoint: Dictionary) -> void:
+	var by_id := {}
+	for q in Game.questions:
+		by_id[String(q.get("id", ""))] = q
+	queue = []
+	for qid in checkpoint["queue"]:
+		queue.append(by_id[qid])
+	total_unique = int(checkpoint["total"])
+	hearts = int(checkpoint["hearts"])
+	correct_done = int(checkpoint["correct"])
+	questions_seen = int(checkpoint["answered"])
+	streak = int(checkpoint["streak"])
+	best_streak = int(checkpoint.get("best_streak", streak))
+	xp_earned = int(checkpoint["xp_earned"])
+
+
+## Snapshot the run after every answered question and on "Leave & save".
+## Called right after show_result(), so an answered current_q is already
+## accounted for (cleared, or requeued on a miss); a current_q the player
+## has not answered yet goes back at the front of the saved queue. Skipped
+## once the queue is empty -- victory is one CONTINUE away then.
+func _write_checkpoint() -> void:
+	if _ended:
+		return
+	var ids: Array = []
+	if not current_q.is_empty() and not question_view.answered:
+		ids.append(String(current_q.get("id", "")))
+	for q in queue:
+		ids.append(String(q.get("id", "")))
+	if ids.is_empty():
+		return
+	Game.save_battle_checkpoint(String(battle["id"]), Rules.make_checkpoint(
+		ids, hearts, correct_done, questions_seen, streak, best_streak, xp_earned, total_unique))
+
+
+## Shown instead of the battle UI when the question pool came back empty
+## (e.g. questions.json failed to load): no free victory, just a way back.
+func _build_pool_error() -> void:
+	var bg := ColorRect.new()
+	bg.color = UITheme.BG
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(bg)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(center)
+
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", UITheme.panel_box(UITheme.PANEL, 16, 28))
+	panel.custom_minimum_size = Vector2(520, 0)
+	center.add_child(panel)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	panel.add_child(box)
+
+	var msg := UITheme.label(Game.t("battle.no_questions"), 16, UITheme.BAD)
+	msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(msg)
+
+	var back := Button.new()
+	back.text = Game.t("battle.back")
+	back.add_theme_font_size_override("font_size", UITheme.fs(16))
+	UITheme.style_button(back, UITheme.PANEL_LIGHT)
+	back.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
+	box.add_child(back)
+
+
+func _on_retreat_pressed() -> void:
+	if _ended:
+		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+		return
+	_show_leave_dialog()
+
+
+## Offer the saved run: resume it, discard it for a fresh attempt, or bail
+## back to the menu keeping the checkpoint for another day. Esc bails too.
+func _show_resume_dialog(checkpoint: Dictionary) -> void:
+	_show_dialog(
+		Game.t("battle.resume_title"),
+		Game.t("battle.resume_prompt") % [int(checkpoint["answered"]), int(checkpoint["total"]), int(checkpoint["hearts"])],
+		[
+			{"text": Game.t("battle.resume"), "color": boss_color.darkened(0.4), "on_pressed": func() -> void:
+				_close_dialog()
+				_next_question()},
+			{"text": Game.t("battle.start_over"), "color": UITheme.BAD.darkened(0.45), "on_pressed": func() -> void:
+				Game.clear_battle_checkpoint(String(battle["id"]))
+				get_tree().reload_current_scene()},
+			{"text": Game.t("battle.back"), "color": UITheme.PANEL_LIGHT, "on_pressed": func() -> void:
+				get_tree().change_scene_to_file("res://scenes/main_menu.tscn")},
+		],
+		func() -> void: get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
+
+
+## Esc here means STAY — the destructive choice (leaving) is never the
+## accidental default.
+func _show_leave_dialog() -> void:
+	_show_dialog(
+		Game.t("battle.leave_title"),
+		Game.t("battle.leave_prompt"),
+		[
+			{"text": Game.t("battle.leave_save"), "color": boss_color.darkened(0.4), "on_pressed": func() -> void:
+				_write_checkpoint()
+				get_tree().change_scene_to_file("res://scenes/main_menu.tscn")},
+			{"text": Game.t("battle.stay"), "color": UITheme.PANEL_LIGHT, "on_pressed": _close_dialog},
+		],
+		_close_dialog)
+
+
+func _show_dialog(title: String, body: String, actions: Array, cancel: Callable) -> void:
+	if dialog != null:
+		return
+	dialog = DialogView.show(self, title, body, actions)
+	dialog_cancel = cancel
+
+
+func _close_dialog() -> void:
+	if dialog != null:
+		DialogView.close(dialog)
+		dialog = null
+
+
 # ---------------------------------------------------------------- end screens
 
 func _end_battle(victory: bool) -> void:
+	if _ended:
+		return
+	_ended = true
+	Game.clear_battle_checkpoint(String(battle["id"]))
 	var accuracy := 0.0
 	if total_unique > 0:
 		accuracy = float(first_try_correct) / float(total_unique)
@@ -323,7 +463,7 @@ func _end_battle(victory: bool) -> void:
 	var retry := Button.new()
 	retry.text = Game.t("battle.retry")
 	retry.add_theme_font_size_override("font_size", UITheme.fs(16))
-	UITheme.style_button(retry, boss_color.darkened(0.35))
+	UITheme.style_button(retry, boss_color.darkened(0.4))
 	retry.pressed.connect(func() -> void: get_tree().reload_current_scene())
 	buttons.add_child(retry)
 

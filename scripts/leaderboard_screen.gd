@@ -15,6 +15,7 @@ const BOARD_COLORS := {
 
 
 func _ready() -> void:
+	Game.setup_scene_root(self)
 	var bg := ColorRect.new()
 	bg.color = UITheme.BG
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -66,6 +67,13 @@ func _ready() -> void:
 	back_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	back_row.add_child(back)
 	root.add_child(back_row)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.is_echo():
+		if (event as InputEventKey).keycode == KEY_ESCAPE:
+			get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+			get_viewport().set_input_as_handled()
 
 
 func _board_title(mode_key: String) -> String:
