@@ -22,12 +22,15 @@ jobs:
     env:
       GODOT_VERSION: "4.6.3"
       GAME: NimbusCloudBossBattle
-      # Verified sha256 of both Godot assets below, same rationale as the
-      # rcodesign pin further down: this editor binary compiles every
-      # published release artifact (Web + all desktop platforms), so an
-      # unverified download is a supply-chain risk on the exact same footing.
-      # Bump deliberately when GODOT_VERSION changes -- download the new
-      # assets, inspect them, compute their sha256.
+      # Pinned sha256 of the exact Godot assets the URLs below point to
+      # (Godot_v4.6.3-stable_linux.x86_64.zip and
+      # Godot_v4.6.3-stable_export_templates.tpz), pinned for the same reason
+      # as rcodesign below: the export artifacts are published on the GitHub
+      # Release, so a corrupted or tampered download must fail the build, not
+      # silently ship. Verified by the maintainer via trust-on-first-use:
+      # each asset was downloaded and checked against Godot's official
+      # SHA512-SUMS.txt, then hashed with sha256. Bump the version and
+      # checksums together, deliberately.
       GODOT_ZIP_SHA256: "d0bc2113065e481c9c2c2b2c37daa4e8be3fe9e27f0ab9ab0b6096e9a37907f3"
       GODOT_TEMPLATES_SHA256: "3fbe2c0e2dec9d537ab9ec97bcf8da91dcf23357fc51f67092dd068d839290a8"
       # Pinned rcodesign (apple-codesign) release + its verified sha256 — see
@@ -150,7 +153,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/web build/linux build/windows build/macos
-          ./godot --headless --path . --import || true
+          # No `|| true`: a failed import (e.g. the bundled Noto fallback
+          # fonts) must fail the build, not silently ship tofu.
+          ./godot --headless --path . --import
           ./godot --headless --path . --export-release "Web" "build/web/index.html"
           ./godot --headless --path . --export-release "Linux" "build/linux/${GAME}.x86_64"
           ./godot --headless --path . --export-release "Windows" "build/windows/${GAME}.exe"

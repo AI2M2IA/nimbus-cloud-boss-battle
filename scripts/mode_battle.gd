@@ -11,6 +11,7 @@ const ModeRules := preload("res://scripts/mode_rules.gd")
 const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
 const UITheme := preload("res://scripts/ui_theme.gd")
 const QuizQuestionViewScript := preload("res://scripts/ui/quiz_question_view.gd")
+const DialogView := preload("res://scripts/ui/dialog_view.gd")
 const ScoreRowScript := preload("res://scripts/ui/score_row.gd")
 
 var mode: Dictionary
@@ -26,6 +27,12 @@ var points: int = ModeRules.DECAY_START_POINTS
 var streak: int = 0
 var best_streak: int = 0
 var xp_earned: int = 0
+## Rescue goal for this run's pool (scales down for small custom sets).
+var pet_goal_count: int = ModeRules.PET_GOAL_CORRECT
+## True when the run draws from a player-authored set instead of the
+## built-in bank; such runs award no XP and no leaderboard entry, so a
+## 1-question custom set can't be farmed for progress.
+var custom_pool: bool = false
 
 var current_q: Dictionary = {}
 
@@ -38,16 +45,31 @@ var question_view  # QuizQuestionViewScript instance; untyped like pet_avatar
 var pet_avatar  # PetAvatarScript instance; untyped like final_avatar below,
 # so calling set_pet()/set_progress()/react_*() doesn't depend on the
 # PetAvatar class_name being registered in the global script class cache.
-var retreat_dialog: ConfirmationDialog
+var dialog: Control = null
+## Safe action for Esc while the abandon dialog is open (STAY) — Esc was
+## inert while a dialog was up, which stranded keyboard-only players.
+var dialog_cancel: Callable = func() -> void: pass
+## Set by _end_run so end-of-run logic (record_mode_result, overlay) runs
+## exactly once -- the quiz view keeps answered == true under the overlay,
+## so Enter/Space would otherwise re-emit continue_requested forever.
+var _ended: bool = false
 
 
 func _ready() -> void:
+	Game.setup_scene_root(self)
 	mode_id = Game.selected_mode
 	mode = Game.get_mode(mode_id)
 	pet = Game.selected_pet if ModeRules.is_valid_pet(Game.selected_pet) else "cat"
 	mode_color = Color(String(mode["color"]))
+	custom_pool = Game.active_set_id() != ""
 	queue = Game.mode_pool_shuffled()
+	pet_goal_count = ModeRules.pet_goal(queue.size())
 
+	if queue.is_empty():
+		# Empty pool (e.g. questions.json failed to load): show an error
+		# instead of falling into _next_question's free instant victory.
+		_build_pool_error()
+		return
 	_build_ui()
 	_update_hud()
 	_next_question()
@@ -123,30 +145,19 @@ func _build_ui() -> void:
 	quit.text = Game.t("battle.retreat")
 	quit.flat = true
 	quit.add_theme_color_override("font_color", UITheme.TEXT_DIM)
-	quit.pressed.connect(_confirm_retreat)
+	quit.pressed.connect(_on_retreat_pressed)
 	root.add_child(quit)
-
-	# Same rationale as battle.gd: a run can be dozens of questions long and
-	# progress is only recorded in _end_run(), so leaving mid-run forfeits it
-	# silently unless the retreat link and Esc are gated behind a confirm.
-	retreat_dialog = ConfirmationDialog.new()
-	retreat_dialog.title = Game.t("battle.retreat_confirm_title")
-	retreat_dialog.dialog_text = Game.t("battle.retreat_confirm_body")
-	retreat_dialog.ok_button_text = Game.t("battle.retreat_confirm_ok")
-	retreat_dialog.cancel_button_text = Game.t("battle.retreat_confirm_cancel")
-	retreat_dialog.confirmed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
-	add_child(retreat_dialog)
-
-
-func _confirm_retreat() -> void:
-	if not retreat_dialog.visible:
-		retreat_dialog.popup_centered()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.is_echo():
 		if (event as InputEventKey).keycode == KEY_ESCAPE:
-			_confirm_retreat()
+			if dialog != null:
+				var cancel := dialog_cancel
+				_close_dialog()
+				cancel.call()
+			else:
+				_on_retreat_pressed()
 			get_viewport().set_input_as_handled()
 
 
@@ -154,25 +165,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _next_question() -> void:
 	if queue.is_empty():
-		_handle_queue_exhausted()
+		_end_run(true)
 		return
 	current_q = queue.pop_front()
 	question_view.show_question(current_q)
 	_update_hud()
-
-
-## Called whenever the queue runs dry. For Survival/Decay, surviving the
-## whole pool is a legitimate clear -- unchanged. For Save the Pet, running
-## out of questions before reaching the 20-correct goal is NOT a rescue: it
-## used to be treated as an automatic win just because the queue emptied,
-## which is only reachable with a custom set smaller than the goal (the
-## built-in 108-question pool always resolves win/lose well before it could
-## run dry, since 20 + 3 - 1 is far under 108).
-func _handle_queue_exhausted() -> void:
-	if mode_id == "pet" and _run_outcome() == "ongoing":
-		_end_run(false, true)
-	else:
-		_end_run(true)
 
 
 func _on_answer_submitted(chosen: Array) -> void:
@@ -211,14 +208,17 @@ func _on_answer_submitted(chosen: Array) -> void:
 	_update_hud()
 
 
-## "saved" (win), "lost" (game over) or "ongoing" — pure logic in mode_rules.gd.
+## "saved" (win), "capped" (Decay question cap reached — win), "lost" (game
+## over) or "ongoing" — pure logic in mode_rules.gd.
 func _run_outcome() -> String:
 	match mode_id:
 		"decay":
 			if ModeRules.decay_is_over(points):
 				return "lost"
+			if answered_count >= ModeRules.DECAY_QUESTION_CAP:
+				return "capped"
 		"pet":
-			return ModeRules.pet_outcome(correct_count, wrong_count)
+			return ModeRules.pet_outcome(correct_count, wrong_count, pet_goal_count)
 		_:
 			if ModeRules.survival_is_over(wrong_count):
 				return "lost"
@@ -226,15 +226,14 @@ func _run_outcome() -> String:
 
 
 func _on_continue_pressed() -> void:
+	if _ended or dialog != null:
+		return
 	var outcome := _run_outcome()
 	if outcome == "lost":
 		_end_run(false)
 		return
-	if outcome == "saved":
+	if outcome == "saved" or outcome == "capped" or queue.is_empty():
 		_end_run(true)
-		return
-	if queue.is_empty():
-		_handle_queue_exhausted()
 		return
 	_next_question()
 
@@ -244,14 +243,14 @@ func _update_hud() -> void:
 	streak_label.text = Game.t("battle.combo") % [streak, best_streak]
 	xp_label.text = Game.t("battle.xp") % xp_earned
 	if pet_avatar != null:
-		pet_avatar.set_progress(correct_count, ModeRules.PET_GOAL_CORRECT, wrong_count, ModeRules.PET_MAX_WRONG)
+		pet_avatar.set_progress(correct_count, pet_goal_count, wrong_count, ModeRules.PET_MAX_WRONG)
 
 
 func _update_pet_reaction(correct: bool) -> void:
 	if pet_avatar == null:
 		return
 	if correct:
-		pet_avatar.react_correct(correct_count, ModeRules.PET_GOAL_CORRECT)
+		pet_avatar.react_correct(correct_count, pet_goal_count)
 	else:
 		pet_avatar.react_wrong(wrong_count, ModeRules.PET_MAX_WRONG)
 
@@ -261,25 +260,88 @@ func _status_text() -> String:
 		"decay":
 			return Game.t("run.points") % points
 		"pet":
-			var rescue: String = Game.t("run.pet_progress") % [Game.t("pet.%s" % pet), correct_count, ModeRules.PET_GOAL_CORRECT]
+			var rescue: String = Game.t("run.pet_progress") % [Game.t("pet.%s" % pet), correct_count, pet_goal_count]
 			return rescue + "\n" + Game.t("run.mistakes_left") % (ModeRules.PET_MAX_WRONG - wrong_count)
 		_:
 			return Game.t("run.mistakes_left") % (ModeRules.SURVIVAL_MAX_WRONG - wrong_count)
 
 
+# --------------------------------------------------- error + abandon dialog
+
+## Shown instead of the run UI when the question pool came back empty
+## (e.g. questions.json failed to load): no free victory, just a way back.
+func _build_pool_error() -> void:
+	var bg := ColorRect.new()
+	bg.color = UITheme.BG
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(bg)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(center)
+
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", UITheme.panel_box(UITheme.PANEL, 16, 28))
+	panel.custom_minimum_size = Vector2(520, 0)
+	center.add_child(panel)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	panel.add_child(box)
+
+	var msg := UITheme.label(Game.t("battle.no_questions"), 16, UITheme.BAD)
+	msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(msg)
+
+	var back := Button.new()
+	back.text = Game.t("battle.back")
+	back.add_theme_font_size_override("font_size", UITheme.fs(16))
+	UITheme.style_button(back, UITheme.PANEL_LIGHT)
+	back.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
+	box.add_child(back)
+
+
+func _on_retreat_pressed() -> void:
+	if _ended:
+		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+		return
+	_show_abandon_dialog()
+
+
+## Modes have no checkpoint (boss battles only), so leaving mid-run needs a
+## confirmation -- the run is gone for good. Esc means STAY: the destructive
+## choice is never the accidental default.
+func _show_abandon_dialog() -> void:
+	if dialog != null:
+		return
+	dialog = DialogView.show(
+		self,
+		Game.t("mode.abandon_title"),
+		Game.t("mode.abandon_prompt"),
+		[
+			{"text": Game.t("mode.abandon"), "color": UITheme.BAD.darkened(0.45), "on_pressed": func() -> void:
+				get_tree().change_scene_to_file("res://scenes/main_menu.tscn")},
+			{"text": Game.t("battle.stay"), "color": UITheme.PANEL_LIGHT, "on_pressed": _close_dialog},
+		])
+	dialog_cancel = _close_dialog
+
+
+func _close_dialog() -> void:
+	if dialog != null:
+		DialogView.close(dialog)
+		dialog = null
+
+
 # ---------------------------------------------------------------- end screen
 
-## incomplete is only ever true for Save the Pet, when the question pool ran
-## out before the 20-correct goal was reached (see _handle_queue_exhausted).
-## It's a distinct third outcome from victory/defeat: not a loss (no wrong-
-## answer threshold was hit), but not a rescue either.
-func _end_run(victory: bool, incomplete: bool = false) -> void:
-	# Record the same metric the leaderboard ranks this mode by (points for
-	# Decay, best streak for Pet, correct_count otherwise -- see
-	# _leaderboard_score) rather than always correct_count, so the "best
-	# score" on the menu card and the number that actually ranks you on the
-	# leaderboard are the same run stat instead of two different ones.
-	Game.record_mode_result(mode_id, _leaderboard_score(), xp_earned)
+func _end_run(victory: bool) -> void:
+	if _ended:
+		return
+	_ended = true
+	# Custom-set runs are practice, not progression: no XP, no leaderboard,
+	# so a tiny hand-made pool can't be farmed for ranks.
+	Game.record_mode_result(mode_id, _leaderboard_score(), 0 if custom_pool else xp_earned)
 
 	var overlay := Control.new()
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -304,17 +366,15 @@ func _end_run(victory: bool, incomplete: bool = false) -> void:
 	panel.add_child(box)
 
 	var title_text: String
-	if incomplete:
-		title_text = Game.t("run.pet_incomplete_title")
-	elif mode_id == "pet":
+	if mode_id == "pet":
 		title_text = Game.t("run.pet_saved_title") if victory else Game.t("run.pet_lost_title")
 	else:
 		title_text = Game.t("run.cleared_title") if victory else Game.t("run.over_title")
-	var title := UITheme.label(title_text, 32, UITheme.TEXT_DIM if incomplete else (UITheme.GOOD if victory else UITheme.BAD))
+	var title := UITheme.label(title_text, 32, UITheme.GOOD if victory else UITheme.BAD)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 
-	var reason := _reason_text(victory, incomplete)
+	var reason := _reason_text(victory)
 	if reason != "":
 		var sub := UITheme.label(reason, 15, UITheme.TEXT_DIM)
 		sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -332,10 +392,14 @@ func _end_run(victory: bool, incomplete: bool = false) -> void:
 
 	box.add_child(UITheme.label(Game.t("run.final_score") % [correct_count, answered_count], 16))
 	box.add_child(UITheme.label(Game.t("battle.best_combo") % best_streak, 16))
-	box.add_child(UITheme.label(Game.t("battle.xp_earned") % xp_earned, 16, UITheme.ACCENT))
+	if custom_pool:
+		box.add_child(UITheme.label(Game.t("run.custom_pool_note"), 14, UITheme.TEXT_DIM))
+	else:
+		box.add_child(UITheme.label(Game.t("battle.xp_earned") % xp_earned, 16, UITheme.ACCENT))
 	box.add_child(UITheme.label(Game.t("battle.total_xp") % [Game.total_xp(), Game.player_rank()], 14, UITheme.TEXT_DIM))
 
-	box.add_child(ScoreRowScript.build(mode_id, _leaderboard_score()))
+	if not custom_pool:
+		box.add_child(ScoreRowScript.build(mode_id, _leaderboard_score()))
 
 	var buttons := HBoxContainer.new()
 	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -345,7 +409,7 @@ func _end_run(victory: bool, incomplete: bool = false) -> void:
 	var retry := Button.new()
 	retry.text = Game.t("run.retry")
 	retry.add_theme_font_size_override("font_size", UITheme.fs(16))
-	UITheme.style_button(retry, mode_color.darkened(0.35))
+	UITheme.style_button(retry, mode_color.darkened(0.4))
 	retry.pressed.connect(func() -> void: get_tree().reload_current_scene())
 	buttons.add_child(retry)
 
@@ -357,15 +421,16 @@ func _end_run(victory: bool, incomplete: bool = false) -> void:
 	buttons.add_child(menu)
 
 
-func _reason_text(victory: bool, incomplete: bool = false) -> String:
-	if incomplete:
-		return Game.t("run.pet_incomplete") % Game.t("pet.%s" % pet)
+func _reason_text(victory: bool) -> String:
 	match mode_id:
 		"pet":
 			var pet_name: String = Game.t("pet.%s" % pet)
-			return Game.t("run.pet_saved") % pet_name if victory else Game.t("run.pet_lost") % pet_name
+			return Game.t("run.pet_saved") % pet_name if victory else Game.t("run.pet_lost") % [pet_name, pet_goal_count]
 		"decay":
-			return "" if victory else Game.t("run.decay_over")
+			if not victory:
+				return Game.t("run.decay_over")
+			return Game.t("run.decay_cap") % ModeRules.DECAY_QUESTION_CAP \
+					if answered_count >= ModeRules.DECAY_QUESTION_CAP else ""
 		_:
 			return "" if victory else Game.t("run.survival_over")
 

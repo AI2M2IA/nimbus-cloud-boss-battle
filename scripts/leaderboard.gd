@@ -17,21 +17,23 @@ const QuizImport := preload("res://scripts/quiz_import.gd")
 const MODES := ["survival", "decay", "pet", "boss"]
 const MAX_NAME_LENGTH := 12
 const DEFAULT_TOP_N := 10
-const MAX_ENTRIES_PER_MODE := 50
 const FALLBACK_NAME := "???"
+## Per-mode cap so leaderboard.json can't grow without bound (record_score
+## only ever appends; the display slices top-N anyway).
+const MAX_ENTRIES_PER_MODE := 100
 
 
-## Trim, strip line breaks, and cap a player name; empty or unsafe (bidi-
-## override, zero-width, control characters -- see QuizImport.has_unsafe_chars)
-## becomes "???". Applied both when an entry is created and, via
-## sanitize_entries() below, when one is loaded from disk.
+## Trim, strip line breaks and control/bidi/zero-width characters, and cap a
+## player name; empty becomes "???". Names are rendered in the UI, so the
+## same character policy as imported question text applies.
 static func sanitize_name(name: String) -> String:
-	var clean := name.replace("\n", " ").replace("\r", " ").strip_edges()
+	var clean := ""
+	for ch in name.replace("\n", " ").replace("\r", " ").strip_edges():
+		if not QuizImport.has_unsafe_chars(ch):
+			clean += ch
 	if clean.length() > MAX_NAME_LENGTH:
 		clean = clean.substr(0, MAX_NAME_LENGTH)
-	if clean == "" or QuizImport.has_unsafe_chars(clean):
-		return FALLBACK_NAME
-	return clean
+	return FALLBACK_NAME if clean.strip_edges() == "" else clean
 
 
 static func make_entry(name: String, mode: String, score: int, date: String) -> Dictionary:
@@ -46,17 +48,31 @@ static func ranks_before(a: Dictionary, b: Dictionary) -> bool:
 	return String(a.get("date", "")) < String(b.get("date", ""))
 
 
-## Insert an entry into an already-ranked array, keeping it ranked.
-## Stable: an entry that ties on score and date goes after existing ones.
-## Returns a new array; the input is not mutated.
+## Insert an entry into an already-ranked array, keeping it ranked, then
+## trim the entry's mode to MAX_ENTRIES_PER_MODE so the stored file stays
+## bounded. Stable: an entry that ties on score and date goes after
+## existing ones. Returns a new array; the input is not mutated.
 static func insert_entry(entries: Array, entry: Dictionary) -> Array:
 	var out := entries.duplicate()
+	var inserted := false
 	for i in range(out.size()):
 		if ranks_before(entry, out[i]):
 			out.insert(i, entry)
-			return out
-	out.append(entry)
-	return out
+			inserted = true
+			break
+	if not inserted:
+		out.append(entry)
+	var mode := String(entry.get("mode", ""))
+	var kept := 0
+	var trimmed: Array = []
+	for e in out:
+		if String(e.get("mode", "")) != mode:
+			trimmed.append(e)
+			continue
+		kept += 1
+		if kept <= MAX_ENTRIES_PER_MODE:
+			trimmed.append(e)
+	return trimmed
 
 
 ## Re-rank an arbitrary array of entries (e.g. a hand-edited file).
@@ -78,38 +94,22 @@ static func top_for_mode(entries: Array, mode: String, n: int = DEFAULT_TOP_N) -
 	return ranked.slice(0, max(n, 0))
 
 
-## Re-derives a raw (possibly hand-edited) entries array into well-shaped
-## entries: drops anything that isn't a dictionary with a known mode, coerces
-## score/date types, and re-applies sanitize_name. Called on every load so an
-## edited leaderboard.json can't smuggle an oversized/unsafe name or a
-## malformed score onto screen -- the same defense-in-depth custom_sets.json
-## already gets on load, just applied here too.
+## Rebuild raw persisted entries into the safe, expected shape. This keeps a
+## hand-edited leaderboard from injecting unsafe names or malformed modes.
 static func sanitize_entries(entries: Array) -> Array:
 	var out: Array = []
-	for e in entries:
-		if typeof(e) != TYPE_DICTIONARY:
+	for entry in entries:
+		if typeof(entry) != TYPE_DICTIONARY:
 			continue
-		var mode := String(e.get("mode", ""))
+		var mode := String(entry.get("mode", ""))
 		if not MODES.has(mode):
 			continue
-		var raw_score = e.get("score", 0)
+		var raw_score = entry.get("score", 0)
 		var score := int(raw_score) if (typeof(raw_score) == TYPE_INT or typeof(raw_score) == TYPE_FLOAT) else 0
 		out.append({
-			"name": sanitize_name(String(e.get("name", ""))),
+			"name": sanitize_name(String(entry.get("name", ""))),
 			"mode": mode,
 			"score": score,
-			"date": String(e.get("date", "")),
+			"date": String(entry.get("date", "")),
 		})
 	return out
-
-
-## Bounds stored entries to the top N per mode so the leaderboard file and
-## its in-memory array don't grow without bound over months of local play.
-## Display already only shows DEFAULT_TOP_N; this just bounds what's kept
-## behind that so an O(n) insert and an O(n log n) load-time sort stay cheap
-## indefinitely instead of growing with every single run ever recorded.
-static func capped(entries: Array, per_mode_cap: int = MAX_ENTRIES_PER_MODE) -> Array:
-	var out: Array = []
-	for m in MODES:
-		out.append_array(top_for_mode(entries, m, per_mode_cap))
-	return sort_entries(out)
