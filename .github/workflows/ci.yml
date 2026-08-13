@@ -24,8 +24,15 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GODOT_VERSION: "4.6.3"
+      # Pinned sha256 of Godot_v4.6.3-stable_linux.x86_64.zip (the exact
+      # asset the URL below points to). Verified by the maintainer via
+      # trust-on-first-use: the zip was downloaded and checked against
+      # Godot's official SHA512-SUMS.txt, then hashed with sha256. See the
+      # download step for why this isn't left unverified. Bump the version
+      # and checksum together, deliberately.
+      GODOT_ZIP_SHA256: "d0bc2113065e481c9c2c2b2c37daa4e8be3fe9e27f0ab9ab0b6096e9a37907f3"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
@@ -41,13 +48,13 @@ jobs:
           bash scripts/dev/check_commit_identity.sh "${BASE_SHA}..${HEAD_SHA}"
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.x"
 
       - name: Cache Godot ${{ env.GODOT_VERSION }}
         id: cache-godot
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/godot
           key: godot-${{ env.GODOT_VERSION }}-linux-headless
@@ -59,13 +66,20 @@ jobs:
           mkdir -p ~/godot && cd ~/godot
           base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
           curl -fL -o godot.zip "${base}/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          # Verify integrity before running the binary (same rationale as the
+          # rcodesign pin in release.yml): this executable runs our test
+          # suite with repo access, so a corrupted or tampered download must
+          # fail the build, not silently execute.
+          echo "${GODOT_ZIP_SHA256}  godot.zip" | sha256sum -c -
           unzip -o godot.zip
           mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot
           chmod +x godot
 
       - name: Import assets
         run: |
-          "$HOME/godot/godot" --headless --path . --import || true
+          # No `|| true`: a failed import (e.g. the bundled Noto fallback
+          # fonts) must fail the build, not silently ship tofu.
+          "$HOME/godot/godot" --headless --path . --import
 
       - name: Static audit + test suite
         run: |

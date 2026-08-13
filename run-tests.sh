@@ -10,6 +10,10 @@ mkdir -p "$PWD/user-data/home/Library/Application Support"
 export HOME="$PWD/user-data/home"
 LOG="$PWD/user-data/godot.log"
 
+# Import assets first so a fresh clone (no .godot cache yet) can load the
+# bundled fallback fonts and every other imported resource during the tests.
+./godot.sh --headless --path . --import
+
 # Godot can log a script compile/parse error (e.g. a bare global class_name
 # reference that isn't registered yet) while still returning a non-null
 # scene/instance, so the GDScript-level checks in tests/run_tests.gd can pass

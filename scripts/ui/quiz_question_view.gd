@@ -87,7 +87,7 @@ func configure(accent_color: Color) -> void:
 	confirm_btn.text = Game.t("battle.confirm")
 	confirm_btn.visible = false
 	confirm_btn.add_theme_font_size_override("font_size", UITheme.fs(16))
-	UITheme.style_button(confirm_btn, UITheme.ACCENT.darkened(0.3))
+	UITheme.style_button(confirm_btn, UITheme.ACCENT.darkened(0.4))
 	confirm_btn.pressed.connect(_on_confirm_pressed)
 	card_box.add_child(confirm_btn)
 
@@ -165,7 +165,11 @@ func show_question(question: Dictionary, badge_suffix: String = "") -> void:
 
 ## Shows/hides the "more below" cue once layout settles on the new content.
 ## Not awaited by callers -- it updates overflow_hint whenever it resolves.
+## The extra frame gives the theme's fallback-font chain time to shape on
+## first use; with only two frames the scrollbar metrics were occasionally
+## stale when this ran right after a scene loaded.
 func _refresh_overflow_hint() -> void:
+	await get_tree().process_frame
 	await get_tree().process_frame
 	await get_tree().process_frame
 	if not is_instance_valid(scroll):
@@ -213,8 +217,11 @@ func show_result(chosen: Array, answers: Array, verdict_text: String, verdict_co
 		btn.disabled = true
 		if answers.has(key):
 			UITheme.style_button(btn, UITheme.GOOD.darkened(0.25))
+			# Shape marker, not just color, for color-blind players.
+			btn.text = "✓  " + btn.text
 		elif chosen.has(key):
 			UITheme.style_button(btn, UITheme.BAD.darkened(0.25))
+			btn.text = "✗  " + btn.text
 	confirm_btn.visible = false
 
 	verdict_label.text = verdict_text

@@ -4,6 +4,8 @@ extends Node
 
 const QuizImport := preload("res://scripts/quiz_import.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd")
+const BattleRules := preload("res://scripts/battle_rules.gd")
+const UIFontsScript := preload("res://scripts/ui_fonts.gd")
 
 const QUESTIONS_PATH := "res://data/questions.json"
 const SAVE_PATH := "user://save.json"
@@ -14,11 +16,13 @@ const TEXT_SCALE_STEP := 0.15
 const CUSTOM_SETS_PATH := "user://custom_sets.json"
 const LEADERBOARD_PATH := "user://leaderboard.json"
 
+## Boss names stay in English in every locale (creative proper nouns, same
+## policy as AWS service names); subtitles are localized via subtitle_key.
 const BATTLES := [
 	{
 		"id": "d0",
 		"boss": "The Cloud Gatekeeper",
-		"subtitle": "Cross-domain warm-up",
+		"subtitle_key": "boss.d0.sub",
 		"domain": 0,
 		"color": "#9b8cff",
 		"hearts": 3,
@@ -26,7 +30,7 @@ const BATTLES := [
 	{
 		"id": "d1",
 		"boss": "The Breach Baron",
-		"subtitle": "D1 - Design Secure Architectures",
+		"subtitle_key": "boss.d1.sub",
 		"domain": 1,
 		"color": "#ff5d5d",
 		"hearts": 5,
@@ -34,7 +38,7 @@ const BATTLES := [
 	{
 		"id": "d2",
 		"boss": "The Chaos Monkey King",
-		"subtitle": "D2 - Design Resilient Architectures",
+		"subtitle_key": "boss.d2.sub",
 		"domain": 2,
 		"color": "#3ecf8e",
 		"hearts": 5,
@@ -42,7 +46,7 @@ const BATTLES := [
 	{
 		"id": "d3",
 		"boss": "The Latency Demon",
-		"subtitle": "D3 - High-Performing Architectures",
+		"subtitle_key": "boss.d3.sub",
 		"domain": 3,
 		"color": "#4f9cf9",
 		"hearts": 5,
@@ -50,7 +54,7 @@ const BATTLES := [
 	{
 		"id": "d4",
 		"boss": "Bill Shock, Budget Devourer",
-		"subtitle": "D4 - Cost-Optimized Architectures",
+		"subtitle_key": "boss.d4.sub",
 		"domain": 4,
 		"color": "#ff9900",
 		"hearts": 5,
@@ -58,12 +62,28 @@ const BATTLES := [
 	{
 		"id": "gauntlet",
 		"boss": "The Examiner",
-		"subtitle": "Final Gauntlet - full exam set",
+		"subtitle_key": "boss.gauntlet.sub",
 		"domain": -1,
 		"color": "#e8c14d",
 		"hearts": 8,
 	},
 ]
+
+## Rank thresholds in XP, ascending; each entry is [min_xp, i18n key].
+## Rebalanced for the 662-question bank: a perfect run on a big boss yields
+## ~42k XP, so the top rank now takes roughly ten flawless boss runs instead
+## of a single one.
+const RANKS := [
+	[0, "rank.novice"],
+	[10000, "rank.rookie"],
+	[40000, "rank.az"],
+	[100000, "rank.wa"],
+	[200000, "rank.champion"],
+	[400000, "rank.hero"],
+]
+
+## Locales written right-to-left; drives layout_direction on scene roots.
+const RTL_LANGS := ["ar", "he", "ur", "fa"]
 
 ## Extra game modes (the classic boss battle is not listed here; it is the
 ## default flow driven by BATTLES). Thresholds live in scripts/mode_rules.gd.
@@ -124,6 +144,10 @@ var custom_sets: Array = []
 var leaderboard_entries: Array = []
 var _strings: Dictionary = {}
 var _fallback: Dictionary = {}
+## Theme carrying the bundled Noto fallback-font chain, applied to every
+## scene root via setup_scene_root(). Without it the Web export (which ships
+## no system fonts) renders CJK/Arabic/Indic/Thai locales as tofu.
+var ui_theme: Theme = Theme.new()
 
 
 func _ready() -> void:
@@ -135,7 +159,29 @@ func _ready() -> void:
 	_fallback = _load_lang_file("en")
 	text_scale = clampf(float(save_data.get("text_scale", 1.0)), TEXT_SCALE_MIN, TEXT_SCALE_MAX)
 	lang = String(save_data.get("lang", "en"))
+	if not _is_known_lang(lang):
+		# A hand-edited save could put anything here (and it gets concatenated
+		# into a res:// path by _load_lang_file) — fall back to English.
+		lang = "en"
 	_strings = _fallback if lang == "en" else _load_lang_file(lang)
+	var fallback_font := UIFontsScript.build_fallback_font()
+	if fallback_font != null:
+		ui_theme.default_font = fallback_font
+
+
+## Shared per-scene setup: the fallback-font theme plus RTL layout for
+## right-to-left locales. Call once at the top of each scene root's _ready.
+func setup_scene_root(scene_root: Control) -> void:
+	scene_root.theme = ui_theme
+	if RTL_LANGS.has(lang):
+		scene_root.layout_direction = Control.LAYOUT_DIRECTION_RTL
+
+
+func _is_known_lang(code: String) -> bool:
+	for l in LANGS:
+		if String(l["code"]) == code:
+			return true
+	return false
 
 
 ## Translate a UI string key in the current language (falls back to English).
@@ -144,6 +190,8 @@ func t(key: String) -> String:
 
 
 func set_language(code: String) -> void:
+	if not _is_known_lang(code):
+		return
 	lang = code
 	_strings = _fallback if code == "en" else _load_lang_file(code)
 	save_data["lang"] = code
@@ -233,15 +281,29 @@ func get_custom_set(id: String) -> Dictionary:
 ## Save (or replace) a named custom set. The questions are expected to be
 ## already validated with QuizImport.validate_bank. Returns the set id.
 func save_custom_set(set_name: String, new_questions: Array) -> String:
-	var id := _custom_set_id(set_name)
+	var clean_name := _sanitize_set_name(set_name)
+	var id := _custom_set_id(clean_name)
 	var existing := get_custom_set(id)
 	if existing.is_empty():
-		custom_sets.append({"id": id, "name": set_name.strip_edges(), "questions": new_questions})
+		custom_sets.append({"id": id, "name": clean_name, "questions": new_questions})
 	else:
-		existing["name"] = set_name.strip_edges()
+		existing["name"] = clean_name
 		existing["questions"] = new_questions
 	_write_custom_sets()
 	return id
+
+
+## Set names are rendered in the UI, so apply the same defense as question
+## text even though the import UI already checks: strip control/bidi/
+## zero-width characters and cap the length.
+func _sanitize_set_name(set_name: String) -> String:
+	var clean := ""
+	for ch in set_name.strip_edges():
+		if not QuizImport.has_unsafe_chars(ch):
+			clean += ch
+	if clean.length() > 60:
+		clean = clean.substr(0, 60)
+	return clean
 
 
 ## Append one validated question to a set, creating the set if needed.
@@ -291,9 +353,7 @@ func _custom_set_id(set_name: String) -> String:
 
 
 func _write_custom_sets() -> void:
-	var f := FileAccess.open(CUSTOM_SETS_PATH, FileAccess.WRITE)
-	if f != null:
-		f.store_string(JSON.stringify({"sets": custom_sets}))
+	_write_json_atomic(CUSTOM_SETS_PATH, JSON.stringify({"sets": custom_sets}))
 
 
 func _load_custom_sets() -> void:
@@ -356,9 +416,7 @@ func last_player_name() -> String:
 
 
 func _write_leaderboard() -> void:
-	var f := FileAccess.open(LEADERBOARD_PATH, FileAccess.WRITE)
-	if f != null:
-		f.store_string(JSON.stringify({"version": 1, "entries": leaderboard_entries}))
+	_write_json_atomic(LEADERBOARD_PATH, JSON.stringify({"version": 1, "entries": leaderboard_entries}))
 
 
 func _load_leaderboard() -> void:
@@ -402,6 +460,48 @@ func record_result(id: String, defeated: bool, accuracy: float, best_streak: int
 	_write_save()
 
 
+# -------------------------------------------------------- battle checkpoints
+
+## Persist an in-progress boss-battle snapshot (built with
+## BattleRules.make_checkpoint) so an interrupted run can resume later.
+## Written after every answered question and when leaving a battle early.
+func save_battle_checkpoint(id: String, checkpoint: Dictionary) -> void:
+	var battles: Dictionary = save_data.get("battles", {})
+	var rec: Dictionary = battles.get(id, {})
+	rec["in_progress"] = checkpoint
+	battles[id] = rec
+	save_data["battles"] = battles
+	_write_save()
+
+
+## The stored checkpoint for a boss, validated against the current question
+## bank by BattleRules.validate_checkpoint. Returns {} when there is none or
+## when it is no longer trustworthy -- an untrusted checkpoint is also
+## dropped from the save so a stale one is never offered twice.
+func battle_checkpoint(id: String) -> Dictionary:
+	var rec: Dictionary = battle_record(id)
+	if not rec.has("in_progress"):
+		return {}
+	var bank_ids := {}
+	for q in questions_for_battle(id):
+		bank_ids[String(q.get("id", ""))] = true
+	var checkpoint: Dictionary = BattleRules.validate_checkpoint(rec["in_progress"], bank_ids)
+	if checkpoint.is_empty():
+		clear_battle_checkpoint(id)
+	return checkpoint
+
+
+func clear_battle_checkpoint(id: String) -> void:
+	var battles: Dictionary = save_data.get("battles", {})
+	var rec: Dictionary = battles.get(id, {})
+	if not rec.has("in_progress"):
+		return
+	rec.erase("in_progress")
+	battles[id] = rec
+	save_data["battles"] = battles
+	_write_save()
+
+
 func mode_record(mode_id: String) -> Dictionary:
 	var modes: Dictionary = save_data.get("modes", {})
 	return modes.get(mode_id, {})
@@ -422,25 +522,49 @@ func total_xp() -> int:
 	return int(save_data.get("xp", 0))
 
 
+func _rank_index(xp: int) -> int:
+	var idx := 0
+	for i in range(RANKS.size()):
+		if xp >= int(RANKS[i][0]):
+			idx = i
+	return idx
+
+
+## Localized title of the player's current rank.
 func player_rank() -> String:
-	var xp := total_xp()
-	if xp >= 40000:
-		return "Solutions Architect Hero"
-	if xp >= 20000:
-		return "Cloud Champion"
-	if xp >= 10000:
-		return "Well-Architected Warrior"
-	if xp >= 4000:
-		return "Availability Zone Adventurer"
-	if xp >= 1000:
-		return "Region Rookie"
-	return "Cloud Novice"
+	return t(String(RANKS[_rank_index(total_xp())][1]))
+
+
+## XP still needed to reach the next rank, and that rank's i18n key.
+## Empty dictionary once the player is at the top rank.
+func next_rank_info() -> Dictionary:
+	var idx := _rank_index(total_xp())
+	if idx >= RANKS.size() - 1:
+		return {}
+	var next: Array = RANKS[idx + 1]
+	return {"remaining": int(next[0]) - total_xp(), "key": String(next[1])}
+
+
+## Write-then-rename so an interruption mid-write can never leave a
+## truncated JSON file: the old file stays intact until the new one is
+## complete. Matters now that save.json is rewritten after every answered
+## question (battle checkpoints), not just at the end of a run.
+static func _write_json_atomic(path: String, text: String) -> void:
+	var tmp := path + ".tmp"
+	var f := FileAccess.open(tmp, FileAccess.WRITE)
+	if f == null:
+		push_error("Could not open %s for writing" % tmp)
+		return
+	f.store_string(text)
+	f.close()
+	var err := DirAccess.rename_absolute(
+		ProjectSettings.globalize_path(tmp), ProjectSettings.globalize_path(path))
+	if err != OK:
+		push_error("Could not finalize %s (rename error %d)" % [path, err])
 
 
 func _write_save() -> void:
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if f != null:
-		f.store_string(JSON.stringify(save_data))
+	_write_json_atomic(SAVE_PATH, JSON.stringify(save_data))
 
 
 func _load_save() -> void:
@@ -451,7 +575,29 @@ func _load_save() -> void:
 		return
 	var data = JSON.parse_string(f.get_as_text())
 	if typeof(data) == TYPE_DICTIONARY:
-		save_data = data
+		save_data = _sanitize_save_data(data)
+
+
+## The save file is player-editable (on web it lives in browser storage), so
+## keep only known keys with sane types instead of trusting whatever is in
+## there — a wrong type used to surface as script errors at startup.
+func _sanitize_save_data(raw: Dictionary) -> Dictionary:
+	var clean: Dictionary = {"xp": 0, "battles": {}}
+	var xp = raw.get("xp")
+	if (typeof(xp) == TYPE_INT or typeof(xp) == TYPE_FLOAT) and float(xp) >= 0.0:
+		clean["xp"] = int(float(xp))
+	for key in ["battles", "modes"]:
+		if typeof(raw.get(key)) == TYPE_DICTIONARY:
+			clean[key] = raw[key]
+	if typeof(raw.get("review_cards")) == TYPE_ARRAY:
+		clean["review_cards"] = raw["review_cards"]
+	var ts = raw.get("text_scale")
+	if typeof(ts) == TYPE_INT or typeof(ts) == TYPE_FLOAT:
+		clean["text_scale"] = clampf(float(ts), TEXT_SCALE_MIN, TEXT_SCALE_MAX)
+	for key in ["lang", "active_set", "player_name"]:
+		if typeof(raw.get(key)) == TYPE_STRING:
+			clean[key] = raw[key]
+	return clean
 
 func _load_flashcards() -> void:
 	var f := FileAccess.open(FLASHCARDS_PATH, FileAccess.READ)

@@ -15,6 +15,12 @@ const SURVIVAL_MAX_WRONG := 3
 const DECAY_START_POINTS := 1000
 const DECAY_WRONG_PENALTY := 100
 const DECAY_CORRECT_REWARD := 50
+## Hard stop so a Decay run can't drag on for the whole 662-question pool
+## (~5+ hours) and so scores stay comparable across bank updates: past the
+## cap the run ends in a win with whatever points are left. 100 correct
+## answers cap the theoretical score at 6000, close to the pre-662-bank
+## maximum (~6400), keeping old leaderboard entries meaningful.
+const DECAY_QUESTION_CAP := 100
 
 const PET_MAX_WRONG := 3
 const PET_GOAL_CORRECT := 20
@@ -40,12 +46,21 @@ static func decay_is_over(points: int) -> bool:
 
 ## Save the Pet: "saved", "lost", or "ongoing" given the counters so far.
 ## A loss (3 wrong) takes precedence if both thresholds were somehow hit.
-static func pet_outcome(correct: int, wrong: int) -> String:
+## `goal` defaults to PET_GOAL_CORRECT but scales down for small custom
+## pools (see pet_goal) so the mode is still winnable there.
+static func pet_outcome(correct: int, wrong: int, goal: int = PET_GOAL_CORRECT) -> String:
 	if wrong >= PET_MAX_WRONG:
 		return "lost"
-	if correct >= PET_GOAL_CORRECT:
+	if correct >= goal:
 		return "saved"
 	return "ongoing"
+
+
+## Rescue goal for a pool of `pool_size` questions: the standard 20, or the
+## whole pool when it is smaller — otherwise a 5-question custom set could
+## never save the pet.
+static func pet_goal(pool_size: int) -> int:
+	return clampi(PET_GOAL_CORRECT, 1, maxi(pool_size, 1))
 
 
 static func is_valid_pet(pet: String) -> bool:

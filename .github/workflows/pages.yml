@@ -28,17 +28,32 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     env:
       GODOT_VERSION: "4.6.3"
+      # Pinned sha256 of the exact assets the URLs below point to
+      # (Godot_v4.6.3-stable_linux.x86_64.zip and
+      # Godot_v4.6.3-stable_export_templates.tpz). Verified by the maintainer
+      # via trust-on-first-use: each asset was downloaded and checked against
+      # Godot's official SHA512-SUMS.txt, then hashed with sha256. See the
+      # download step for why this isn't left unverified. Bump the version
+      # and checksums together, deliberately.
+      GODOT_ZIP_SHA256: "d0bc2113065e481c9c2c2b2c37daa4e8be3fe9e27f0ab9ab0b6096e9a37907f3"
+      GODOT_TEMPLATES_SHA256: "3fbe2c0e2dec9d537ab9ec97bcf8da91dcf23357fc51f67092dd068d839290a8"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install Godot ${{ env.GODOT_VERSION }} + export templates
         run: |
           set -euo pipefail
           base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
           curl -fL -o godot.zip "${base}/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          # Verify integrity before running the editor or shipping the
+          # templates (same rationale as the rcodesign pin in release.yml):
+          # the export artifact is published to GitHub Pages, so a corrupted
+          # or tampered download must fail the build, not silently ship.
+          echo "${GODOT_ZIP_SHA256}  godot.zip" | sha256sum -c -
           unzip -q -o godot.zip
           mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot && chmod +x godot
           curl -fL -o templates.tpz "${base}/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          echo "${GODOT_TEMPLATES_SHA256}  templates.tpz" | sha256sum -c -
           unzip -q -o templates.tpz -d _tpl
           dest="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
           mkdir -p "$dest"
@@ -74,15 +89,17 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/web
-          ./godot --headless --path . --import || true
+          # No `|| true`: a failed import (e.g. the bundled Noto fallback
+          # fonts) must fail the build, not silently ship tofu.
+          ./godot --headless --path . --import
           ./godot --headless --path . --export-release "Web" build/web/index.html
           ls -la build/web
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
           path: build/web
 
       - name: Deploy to GitHub Pages
         id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

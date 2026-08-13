@@ -5,9 +5,11 @@ extends Control
 const ModeRules := preload("res://scripts/mode_rules.gd")
 const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
 const UITheme := preload("res://scripts/ui_theme.gd")
+const ReviewSchedulerScript := preload("res://scripts/review_scheduler.gd")
 
 
 func _ready() -> void:
+	Game.setup_scene_root(self)
 	var bg := ColorRect.new()
 	bg.color = UITheme.BG
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -42,6 +44,16 @@ func _ready() -> void:
 	var xp := UITheme.label(Game.t("menu.xp_rank") % [Game.total_xp(), Game.player_rank()], 20, UITheme.GOOD)
 	xp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(xp)
+
+	var next_rank := Game.next_rank_info()
+	var xp_next_text: String
+	if next_rank.is_empty():
+		xp_next_text = Game.t("menu.xp_max")
+	else:
+		xp_next_text = Game.t("menu.xp_next") % [int(next_rank["remaining"]), Game.t(String(next_rank["key"]))]
+	var xp_next := UITheme.label(xp_next_text, 14, UITheme.TEXT_DIM)
+	xp_next.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	root.add_child(xp_next)
 
 	root.add_child(_make_language_row())
 	root.add_child(_make_extras_row())
@@ -162,7 +174,12 @@ func _make_extras_row() -> HBoxContainer:
 	row.add_child(lb_btn)
 
 	var fc_btn := Button.new()
-	fc_btn.text = Game.t("menu.flashcards")
+	# Due-card count on the button itself: it's the game's only daily hook,
+	# and it used to live hidden one screen away inside the flashcards view.
+	var scheduler = ReviewSchedulerScript.new()
+	var all_cards: Array = scheduler.ensure_cards_for_questions(Game.review_cards(), Game.flashcards)
+	var due_count: int = scheduler.due_cards(all_cards, Game.today_day()).size()
+	fc_btn.text = Game.t("menu.flashcards_due") % due_count if due_count > 0 else Game.t("menu.flashcards")
 	fc_btn.add_theme_font_size_override("font_size", UITheme.fs(15))
 	UITheme.style_button(fc_btn, UITheme.PANEL_LIGHT)
 	fc_btn.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/flashcards.tscn"))
@@ -185,7 +202,7 @@ func _make_card(battle: Dictionary) -> PanelContainer:
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(name_label)
 
-	var sub := UITheme.label(String(battle["subtitle"]), 14, UITheme.TEXT_DIM)
+	var sub := UITheme.label(Game.t(String(battle["subtitle_key"])), 14, UITheme.TEXT_DIM)
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(sub)
 
@@ -193,9 +210,13 @@ func _make_card(battle: Dictionary) -> PanelContainer:
 	box.add_child(UITheme.label(Game.t("menu.card_stats") % [count, int(battle["hearts"])], 14, UITheme.TEXT))
 
 	var rec := Game.battle_record(String(battle["id"]))
+	var in_progress: Dictionary = Game.battle_checkpoint(String(battle["id"]))
 	var status := Game.t("menu.not_fought")
 	var status_color := UITheme.TEXT_DIM
-	if not rec.is_empty():
+	if not in_progress.is_empty():
+		status = Game.t("menu.in_progress") % [int(in_progress["answered"]), int(in_progress["total"])]
+		status_color = UITheme.ACCENT
+	elif not rec.is_empty():
 		if rec.get("defeated", false):
 			status = Game.t("menu.defeated") % [int(round(float(rec.get("best_accuracy", 0.0)) * 100.0)), int(rec.get("best_streak", 0))]
 			status_color = UITheme.GOOD
@@ -211,7 +232,7 @@ func _make_card(battle: Dictionary) -> PanelContainer:
 	var fight := Button.new()
 	fight.text = Game.t("menu.fight")
 	fight.add_theme_font_size_override("font_size", UITheme.fs(18))
-	UITheme.style_button(fight, color.darkened(0.35))
+	UITheme.style_button(fight, color.darkened(0.4))
 	fight.pressed.connect(_on_fight_pressed.bind(String(battle["id"])))
 	box.add_child(fight)
 
@@ -269,7 +290,7 @@ func _make_mode_card(mode: Dictionary) -> PanelContainer:
 			pet_btn.text = Game.t("pet.%s" % p)
 			pet_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			pet_btn.add_theme_font_size_override("font_size", UITheme.fs(14))
-			UITheme.style_button(pet_btn, color.darkened(0.35))
+			UITheme.style_button(pet_btn, color.darkened(0.4))
 			pet_btn.pressed.connect(_on_mode_pressed.bind(id, String(p)))
 			choice.add_child(pet_btn)
 			pets.add_child(choice)
@@ -278,7 +299,7 @@ func _make_mode_card(mode: Dictionary) -> PanelContainer:
 		var start := Button.new()
 		start.text = Game.t("mode.start")
 		start.add_theme_font_size_override("font_size", UITheme.fs(18))
-		UITheme.style_button(start, color.darkened(0.35))
+		UITheme.style_button(start, color.darkened(0.4))
 		start.pressed.connect(_on_mode_pressed.bind(id, Game.selected_pet))
 		box.add_child(start)
 

@@ -49,10 +49,12 @@ func _capture_signal_payload(payload) -> void:
 
 func _initialize() -> void:
 	_test_rules()
+	_test_checkpoints()
 	_test_modes()
 	_test_pet_avatar()
 	_test_question_bank()
 	_test_game_state()
+	_test_save_hardening()
 	_test_i18n()
 	_test_quiz_import()
 	_test_leaderboard()
@@ -98,6 +100,13 @@ func _restore_file(path: String, content) -> void:
 		f.store_string(String(content))
 
 
+## The Game autoload is not exposed as a global identifier to a -s main
+## script at compile time; resolve it through the tree instead (relative
+## path -- during _initialize the absolute "/root/Game" is not wired yet).
+func _game_autoload():
+	return root.get_node("Game")
+
+
 # ------------------------------------------------------------- battle rules
 
 func _test_rules() -> void:
@@ -126,6 +135,73 @@ func _test_rules() -> void:
 	check(Rules.requeue_position(4) == 4, "requeue at the offset boundary returns queue size")
 	check(Rules.requeue_position(2) == 2, "requeue clamps to queue size for a short queue")
 	check(Rules.requeue_position(0) == 0, "requeue into empty queue")
+
+
+# ---------------------------------------------------------- run checkpoints
+
+func _test_checkpoints() -> void:
+	print("[checkpoints]")
+	var bank := {"q1": true, "q2": true, "q3": true, "q4": true}
+
+	var cp := Rules.make_checkpoint(["q3", "q4"], 3, 2, 5, 1, 2, 1300, 4)
+	var ok := Rules.validate_checkpoint(cp, bank)
+	check(not ok.is_empty(), "a well-formed checkpoint validates")
+	check(ok.get("queue") == ["q3", "q4"], "queue order survives validation")
+	check(int(ok.get("hearts", -1)) == 3, "hearts survive validation")
+	check(int(ok.get("correct", -1)) == 2, "correct count survives validation")
+	check(int(ok.get("answered", -1)) == 5, "answered count survives validation")
+	check(int(ok.get("streak", -1)) == 1, "streak survives validation")
+	check(int(ok.get("best_streak", -1)) == 2, "best_streak survives validation")
+	check(int(ok.get("xp_earned", -1)) == 1300, "xp survives validation")
+	check(int(ok.get("total", -1)) == 4, "total survives validation")
+
+	# JSON round-trip turns every number into a float; integral floats must
+	# still validate (that is how a real save.json comes back).
+	var round_tripped = JSON.parse_string(JSON.stringify(cp))
+	check(not Rules.validate_checkpoint(round_tripped, bank).is_empty(), "a JSON round-tripped checkpoint still validates")
+
+	# best_streak predates nothing here, but an older save without the field
+	# must still be accepted, falling back to the current streak.
+	var legacy := Rules.make_checkpoint(["q3", "q4"], 3, 2, 5, 1, 1, 1300, 4)
+	legacy.erase("best_streak")
+	var legacy_ok := Rules.validate_checkpoint(legacy, bank)
+	check(not legacy_ok.is_empty(), "a checkpoint without best_streak still validates")
+	check(int(legacy_ok.get("best_streak", -1)) == 1, "missing best_streak falls back to streak")
+
+	check(Rules.validate_checkpoint("garbage", bank).is_empty(), "a non-dictionary checkpoint is dropped")
+	check(Rules.validate_checkpoint({}, bank).is_empty(), "an empty checkpoint is dropped")
+
+	var no_queue := Rules.make_checkpoint([], 3, 4, 4, 0, 0, 400, 4)
+	check(Rules.validate_checkpoint(no_queue, bank).is_empty(), "an empty queue is dropped")
+
+	var foreign := Rules.make_checkpoint(["q3", "zz"], 3, 2, 5, 1, 1, 1300, 4)
+	check(Rules.validate_checkpoint(foreign, bank).is_empty(), "a queue id missing from the bank is dropped")
+
+	var dup := Rules.make_checkpoint(["q3", "q3"], 3, 2, 5, 1, 1, 1300, 4)
+	check(Rules.validate_checkpoint(dup, bank).is_empty(), "duplicate queue ids are dropped")
+
+	var dead := Rules.make_checkpoint(["q3", "q4"], 0, 2, 5, 1, 1, 1300, 4)
+	check(Rules.validate_checkpoint(dead, bank).is_empty(), "zero hearts is dropped")
+
+	var bad_math := Rules.make_checkpoint(["q3", "q4"], 3, 1, 5, 1, 1, 1300, 4)
+	check(Rules.validate_checkpoint(bad_math, bank).is_empty(), "correct + remaining != total is dropped")
+
+	var bad_answered := Rules.make_checkpoint(["q3", "q4"], 3, 2, 1, 1, 1, 1300, 4)
+	check(Rules.validate_checkpoint(bad_answered, bank).is_empty(), "answered < correct is dropped")
+
+	var neg_xp := Rules.make_checkpoint(["q3", "q4"], 3, 2, 5, 1, 1, -100, 4)
+	check(Rules.validate_checkpoint(neg_xp, bank).is_empty(), "negative XP is dropped")
+
+	var wrong_type := Rules.make_checkpoint(["q3", "q4"], 3, 2, 5, 1, 1, 1300, 4)
+	wrong_type["hearts"] = "three"
+	check(Rules.validate_checkpoint(wrong_type, bank).is_empty(), "a non-numeric field is dropped")
+
+	var fractional := Rules.make_checkpoint(["q3", "q4"], 3, 2, 5, 1, 1, 1300, 4)
+	fractional["xp_earned"] = 1300.5
+	check(Rules.validate_checkpoint(fractional, bank).is_empty(), "a fractional float is dropped")
+
+	var low_best := Rules.make_checkpoint(["q3", "q4"], 3, 2, 5, 3, 1, 1300, 4)
+	check(Rules.validate_checkpoint(low_best, bank).is_empty(), "best_streak below streak is dropped")
 
 
 # --------------------------------------------------------------- mode rules
@@ -159,6 +235,14 @@ func _test_modes() -> void:
 	check(ModeRules.pet_outcome(0, 3) == "lost", "pet lost at exactly 3 wrong")
 	check(ModeRules.pet_outcome(19, 3) == "lost", "pet lost at 3 wrong even with 19 correct")
 	check(ModeRules.pet_outcome(20, 3) == "lost", "loss takes precedence over win")
+	check(ModeRules.pet_goal(662) == 20, "pet goal stays 20 on the full bank")
+	check(ModeRules.pet_goal(20) == 20, "pet goal stays 20 at exactly 20 questions")
+	check(ModeRules.pet_goal(5) == 5, "pet goal scales down to a 5-question pool")
+	check(ModeRules.pet_goal(1) == 1, "pet goal scales down to a 1-question pool")
+	check(ModeRules.pet_outcome(5, 0, 5) == "saved", "scaled goal is winnable on a small pool")
+	check(ModeRules.pet_outcome(4, 0, 5) == "ongoing", "scaled goal not yet met")
+	check(ModeRules.pet_outcome(4, 3, 5) == "lost", "loss still takes precedence with a scaled goal")
+	check(ModeRules.DECAY_QUESTION_CAP == 100, "decay has a 100-question cap")
 	check(ModeRules.PETS.size() == 5, "5 pets available")
 	check(ModeRules.is_valid_pet("cat") and ModeRules.is_valid_pet("fish"), "cat and fish are valid pets")
 	check(not ModeRules.is_valid_pet("dragon"), "dragon is not a pet")
@@ -233,6 +317,60 @@ func _test_question_bank() -> void:
 	check(bad_answers == 0, "every answer key exists in options")
 	check(bad_two == 0, "select_two questions have exactly 2 answers")
 
+	# Regression: the original supplemental batch (vpc-q00..09) had the
+	# correct answer on "A" in all 10 questions, with nothing here to catch
+	# it — a player could learn to guess a fixed letter instead of reading
+	# the question. Guards against the same mistake creeping back in for any
+	# single-answer letter, without demanding perfect balance.
+	var letter_counts := {"A": 0, "B": 0, "C": 0, "D": 0}
+	var single_supplemental := 0
+	for q in qs:
+		if String(q.get("source", "")) != "supplemental":
+			continue
+		if String(q.get("type", "")) != "single":
+			continue
+		single_supplemental += 1
+		var ans: Array = q.get("answers", [])
+		if ans.size() == 1 and letter_counts.has(String(ans[0])):
+			letter_counts[String(ans[0])] += 1
+	var max_share := 0.0
+	if single_supplemental > 0:
+		for letter in letter_counts:
+			max_share = max(max_share, float(letter_counts[letter]) / float(single_supplemental))
+	check(
+		single_supplemental == 0 or max_share <= 0.6,
+		"supplemental answers aren't dominated by one letter (worst share %.0f%% of %d)"
+			% [max_share * 100.0, single_supplemental]
+	)
+
+	# Regression: questions.json carries a `counts` summary block (total /
+	# byDomain) that nothing else in the game or this test suite reads --
+	# it silently drifted out of sync with the real array after a past
+	# content edit and nobody noticed for a whole round of changes. Catch
+	# that class of mistake here. Regenerate with
+	# `python3 data/build_question_stats.py` after editing questions.json.
+	var counts: Dictionary = data.get("counts", {})
+	check(
+		int(counts.get("total", -1)) == qs.size(),
+		"counts.total (%s) matches the actual question count (%d)"
+			% [str(counts.get("total")), qs.size()]
+	)
+	var actual_by_domain := {}
+	for q in qs:
+		# JSON.parse_string() yields floats for numeric fields, and
+		# str(2.0) != "2" -- cast through int() first so the key matches
+		# the plain "0".."4" string keys the JSON file itself uses.
+		var domain_key := str(int(q.get("domain")))
+		actual_by_domain[domain_key] = actual_by_domain.get(domain_key, 0) + 1
+	var counts_by_domain: Dictionary = counts.get("byDomain", {})
+	var by_domain_matches := counts_by_domain.size() == actual_by_domain.size()
+	if by_domain_matches:
+		for domain_key in actual_by_domain:
+			if int(counts_by_domain.get(domain_key, -1)) != actual_by_domain[domain_key]:
+				by_domain_matches = false
+				break
+	check(by_domain_matches, "counts.byDomain matches the actual per-domain breakdown (stale? re-run data/build_question_stats.py)")
+
 
 # -------------------------------------------------------------- game state
 
@@ -268,11 +406,22 @@ func _test_game_state() -> void:
 	check(gs.get_battle("nope")["id"] == "d0", "unknown battle falls back to d0")
 
 	gs.save_data = {"xp": 0, "battles": {}}
+	gs._fallback = gs._load_lang_file("en")
 	check(gs.player_rank() == "Cloud Novice", "rank at 0 XP")
-	gs.save_data["xp"] = 4500
-	check(gs.player_rank() == "Availability Zone Adventurer", "rank at 4500 XP")
+	gs.save_data["xp"] = 9999
+	check(gs.player_rank() == "Cloud Novice", "rank just under the first threshold")
+	gs.save_data["xp"] = 10000
+	check(gs.player_rank() == "Region Rookie", "rank at the first threshold")
+	gs.save_data["xp"] = 45000
+	check(gs.player_rank() == "Availability Zone Adventurer", "rank at 45000 XP")
 	gs.save_data["xp"] = 999999
 	check(gs.player_rank() == "Solutions Architect Hero", "top rank")
+	var next: Dictionary = gs.next_rank_info()
+	check(next.is_empty(), "no next rank at the top")
+	gs.save_data["xp"] = 0
+	next = gs.next_rank_info()
+	check(int(next.get("remaining", -1)) == 10000, "next rank is 10000 XP away at zero")
+	check(String(next.get("key", "")) == "rank.rookie", "next rank key is the rookie rank")
 
 	# record_result mutates and persists; snapshot the real save and restore it.
 	gs._load_save()
@@ -293,15 +442,58 @@ func _test_game_state() -> void:
 	gs.free()
 
 
+# ---------------------------------------------------------- save hardening
+
+func _test_save_hardening() -> void:
+	print("[save_hardening]")
+	var gs = GameState.new()
+
+	# A hand-edited save with wrong types must not survive as-is.
+	var dirty := {
+		"xp": "lots",
+		"battles": ["not", "a", "dict"],
+		"text_scale": 99.0,
+		"lang": "../../etc/passwd",
+		"unknown_key": 1,
+		"player_name": "  ok name  ",
+	}
+	var clean: Dictionary = gs._sanitize_save_data(dirty)
+	check(int(clean.get("xp", -1)) == 0, "non-numeric XP resets to 0")
+	check(typeof(clean.get("battles")) == TYPE_DICTIONARY, "non-dict battles resets to {}")
+	check(is_equal_approx(float(clean.get("text_scale", -1.0)), gs.TEXT_SCALE_MAX), "text_scale clamps to max")
+	check(String(clean.get("lang", "")) == "../../etc/passwd", "lang string survives sanitizing...")
+	check(not gs._is_known_lang(String(clean.get("lang", ""))), "...but is not a known language...")
+	check(String(clean.get("player_name", "")) == "  ok name  ", "known string keys are kept")
+	check(not clean.has("unknown_key"), "unknown keys are dropped")
+
+	# set_language rejects unknown codes instead of writing them to the save.
+	gs._fallback = gs._load_lang_file("en")
+	gs.save_data = {"xp": 0, "battles": {}}
+	gs.set_language("../../etc/passwd")
+	check(gs.lang != "../../etc/passwd", "set_language rejects an unknown code")
+	check(String(gs.save_data.get("lang", "")) != "../../etc/passwd", "an unknown lang code is never persisted")
+
+	# Atomic writes leave no stray .tmp file behind.
+	var snap = _snapshot_file(GameState.SAVE_PATH)
+	gs.save_data = {"xp": 123, "battles": {}}
+	gs._write_save()
+	check(FileAccess.file_exists(GameState.SAVE_PATH), "atomic write lands the save file")
+	check(not FileAccess.file_exists(GameState.SAVE_PATH + ".tmp"), "atomic write leaves no .tmp behind")
+	var reloaded = JSON.parse_string(FileAccess.open(GameState.SAVE_PATH, FileAccess.READ).get_as_text())
+	check(int(reloaded.get("xp", -1)) == 123, "the atomically written save parses back")
+	_restore_file(GameState.SAVE_PATH, snap)
+	gs.free()
+
+
 # -------------------------------------------------------------------- i18n
 
 func _test_i18n() -> void:
 	print("[i18n]")
 	var gs = GameState.new()
 	var en: Dictionary = gs._load_lang_file("en")
-	var pt: Dictionary = gs._load_lang_file("pt-BR")
+	var pt: Dictionary = gs._load_lang_file("pt")
 	check(en.size() > 0, "en.json loads (%d keys)" % en.size())
-	check(pt.size() > 0, "pt-BR.json loads (%d keys)" % pt.size())
+	check(pt.size() > 0, "pt.json loads (%d keys)" % pt.size())
 	check(gs.LANGS.size() == 19, "19 languages defined (book reference list)")
 
 	# Every language in LANGS must ship a complete, consistent file whose
@@ -361,6 +553,20 @@ func _test_i18n() -> void:
 		if not en.has(String(m["desc_key"])):
 			missing_mode_keys += 1
 	check(missing_mode_keys == 0, "mode name/desc keys exist in en.json")
+
+	# Every boss subtitle i18n key must exist in en.json.
+	var missing_boss_keys := 0
+	for b in gs.BATTLES:
+		if not en.has(String(b["subtitle_key"])):
+			missing_boss_keys += 1
+	check(missing_boss_keys == 0, "boss subtitle keys exist in en.json")
+
+	# Every rank i18n key must exist in en.json.
+	var missing_rank_keys := 0
+	for r in gs.RANKS:
+		if not en.has(String(r[1])):
+			missing_rank_keys += 1
+	check(missing_rank_keys == 0, "rank keys exist in en.json")
 
 	# Every pet has a translation key.
 	var missing_pet_keys := 0
@@ -427,6 +633,8 @@ func _test_leaderboard() -> void:
 	check(Leaderboard.sanitize_name("  Bob  ") == "Bob", "sanitize_name trims")
 	check(Leaderboard.sanitize_name("") == Leaderboard.FALLBACK_NAME, "empty name -> fallback")
 	check(Leaderboard.sanitize_name("a\nb") == "a b", "newlines become spaces")
+	check(Leaderboard.sanitize_name("a" + char(0x202E) + "b") == "ab", "bidi overrides are stripped from names")
+	check(Leaderboard.sanitize_name(char(0x200B)) == Leaderboard.FALLBACK_NAME, "a name of only unsafe chars falls back")
 	check(Leaderboard.sanitize_name("abcdefghijklmnop").length() == Leaderboard.MAX_NAME_LENGTH, "name is capped")
 	var a := Leaderboard.make_entry("A", "survival", 10, "2026-01-01T00:00:00")
 	var b := Leaderboard.make_entry("B", "survival", 5, "2026-01-01T00:00:00")
@@ -442,6 +650,16 @@ func _test_leaderboard() -> void:
 	var mixed := [a, b, Leaderboard.make_entry("D", "decay", 99, "2026-01-01T00:00:00")]
 	check(Leaderboard.top_for_mode(mixed, "survival", 10).size() == 2, "top_for_mode filters by mode")
 	check(Leaderboard.top_for_mode(mixed, "survival", 1).size() == 1, "top_for_mode caps at N")
+
+	# Per-mode bound: inserting past MAX_ENTRIES_PER_MODE trims the worst
+	# entries of that mode only, so leaderboard.json can't grow unbounded.
+	var capped: Array = []
+	for i in range(Leaderboard.MAX_ENTRIES_PER_MODE + 5):
+		capped = Leaderboard.insert_entry(capped, Leaderboard.make_entry("p%d" % i, "survival", i, "2026-01-01T00:00:00"))
+	check(Leaderboard.top_for_mode(capped, "survival", 999).size() == Leaderboard.MAX_ENTRIES_PER_MODE, "one mode is capped at MAX_ENTRIES_PER_MODE")
+	capped = Leaderboard.insert_entry(capped, Leaderboard.make_entry("other", "decay", 1, "2026-01-01T00:00:00"))
+	check(Leaderboard.top_for_mode(capped, "decay", 999).size() == 1, "other modes are untouched by the cap")
+	check(Leaderboard.top_for_mode(capped, "survival", 999)[0]["score"] == Leaderboard.MAX_ENTRIES_PER_MODE + 4, "the cap keeps the best entries")
 
 
 # --------------------------------------------------------------- custom sets
@@ -600,8 +818,15 @@ func _test_scene_smoke() -> void:
 ## appears, then shrink the text back down and confirm the hint hides again.
 func _test_overflow_hint() -> void:
 	print("[overflow_hint]")
+	# Driving a real battle scene answers real questions (its handlers run),
+	# which now writes battle checkpoints into the save -- snapshot the save
+	# and force a fresh d0 battle so a leftover checkpoint can't push the
+	# scene down the resume-dialog path and skew these layout checks.
+	var snap_save = _snapshot_file(GameState.SAVE_PATH)
+	_game_autoload().clear_battle_checkpoint("d0")
 	await _check_overflow_hint_for_scene("res://scenes/battle.tscn")
 	await _check_overflow_hint_for_scene("res://scenes/mode_battle.tscn")
+	_restore_file(GameState.SAVE_PATH, snap_save)
 
 
 func _check_overflow_hint_for_scene(scene_path: String) -> void:
@@ -653,6 +878,11 @@ func _check_overflow_hint_for_scene(scene_path: String) -> void:
 ## after each press, not just the internal selected_keys array.
 func _test_select_two_keyboard() -> void:
 	print("[select_two_keyboard]")
+	# Same isolation as _test_overflow_hint: the synthetic key presses below
+	# also hit the real first question's handlers, which write a checkpoint
+	# into the save -- snapshot/restore so it never leaks between runs.
+	var snap_save = _snapshot_file(GameState.SAVE_PATH)
+	_game_autoload().clear_battle_checkpoint("d0")
 	# Drive the already-configured question_view off a real battle.tscn
 	# instance (same approach as _check_overflow_hint_for_scene) rather than
 	# instantiating QuizQuestionView standalone -- see the note by the
@@ -725,6 +955,7 @@ func _test_select_two_keyboard() -> void:
 	check(_last_signal_payload == ["A", "C"], "select_two: Enter submits the current selection")
 
 	instance.queue_free()
+	_restore_file(GameState.SAVE_PATH, snap_save)
 
 
 func _press_key(node, keycode: int) -> void:

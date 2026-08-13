@@ -12,18 +12,28 @@ extends RefCounted
 ## - "pet":      best streak of the run
 ## - "boss":     XP earned in a boss battle
 
+const QuizImport := preload("res://scripts/quiz_import.gd")
+
 const MODES := ["survival", "decay", "pet", "boss"]
 const MAX_NAME_LENGTH := 12
 const DEFAULT_TOP_N := 10
 const FALLBACK_NAME := "???"
+## Per-mode cap so leaderboard.json can't grow without bound (record_score
+## only ever appends; the display slices top-N anyway).
+const MAX_ENTRIES_PER_MODE := 100
 
 
-## Trim, strip line breaks, and cap a player name; empty becomes "???".
+## Trim, strip line breaks and control/bidi/zero-width characters, and cap a
+## player name; empty becomes "???". Names are rendered in the UI, so the
+## same character policy as imported question text applies.
 static func sanitize_name(name: String) -> String:
-	var clean := name.replace("\n", " ").replace("\r", " ").strip_edges()
+	var clean := ""
+	for ch in name.replace("\n", " ").replace("\r", " ").strip_edges():
+		if not QuizImport.has_unsafe_chars(ch):
+			clean += ch
 	if clean.length() > MAX_NAME_LENGTH:
 		clean = clean.substr(0, MAX_NAME_LENGTH)
-	return FALLBACK_NAME if clean == "" else clean
+	return FALLBACK_NAME if clean.strip_edges() == "" else clean
 
 
 static func make_entry(name: String, mode: String, score: int, date: String) -> Dictionary:
@@ -38,17 +48,31 @@ static func ranks_before(a: Dictionary, b: Dictionary) -> bool:
 	return String(a.get("date", "")) < String(b.get("date", ""))
 
 
-## Insert an entry into an already-ranked array, keeping it ranked.
-## Stable: an entry that ties on score and date goes after existing ones.
-## Returns a new array; the input is not mutated.
+## Insert an entry into an already-ranked array, keeping it ranked, then
+## trim the entry's mode to MAX_ENTRIES_PER_MODE so the stored file stays
+## bounded. Stable: an entry that ties on score and date goes after
+## existing ones. Returns a new array; the input is not mutated.
 static func insert_entry(entries: Array, entry: Dictionary) -> Array:
 	var out := entries.duplicate()
+	var inserted := false
 	for i in range(out.size()):
 		if ranks_before(entry, out[i]):
 			out.insert(i, entry)
-			return out
-	out.append(entry)
-	return out
+			inserted = true
+			break
+	if not inserted:
+		out.append(entry)
+	var mode := String(entry.get("mode", ""))
+	var kept := 0
+	var trimmed: Array = []
+	for e in out:
+		if String(e.get("mode", "")) != mode:
+			trimmed.append(e)
+			continue
+		kept += 1
+		if kept <= MAX_ENTRIES_PER_MODE:
+			trimmed.append(e)
+	return trimmed
 
 
 ## Re-rank an arbitrary array of entries (e.g. a hand-edited file).

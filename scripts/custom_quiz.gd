@@ -24,6 +24,7 @@ var add_status: Label
 
 
 func _ready() -> void:
+	Game.setup_scene_root(self)
 	var bg := ColorRect.new()
 	bg.color = UITheme.BG
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -78,6 +79,13 @@ func _ready() -> void:
 	add_child(file_dialog)
 
 	_refresh_pool_list()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.is_echo():
+		if (event as InputEventKey).keycode == KEY_ESCAPE:
+			get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+			get_viewport().set_input_as_handled()
 
 
 # ------------------------------------------------------------- question pool
@@ -173,6 +181,9 @@ func _make_import_panel() -> PanelContainer:
 	load_btn.add_theme_font_size_override("font_size", UITheme.fs(14))
 	UITheme.style_button(load_btn, UITheme.PANEL_LIGHT)
 	load_btn.pressed.connect(func() -> void: file_dialog.popup_centered_ratio(0.7))
+	# FileDialog's filesystem access silently does nothing in a browser; hide
+	# the button there (paste still works) instead of offering a dead control.
+	load_btn.visible = not OS.has_feature("web")
 	name_row.add_child(load_btn)
 
 	import_text = TextEdit.new()
@@ -184,7 +195,7 @@ func _make_import_panel() -> PanelContainer:
 	var import_btn := Button.new()
 	import_btn.text = Game.t("custom.import_btn")
 	import_btn.add_theme_font_size_override("font_size", UITheme.fs(16))
-	UITheme.style_button(import_btn, UITheme.ACCENT.darkened(0.3))
+	UITheme.style_button(import_btn, UITheme.ACCENT.darkened(0.4))
 	import_btn.pressed.connect(_on_import_pressed)
 	box.add_child(import_btn)
 
@@ -200,7 +211,7 @@ func _on_file_selected(path: String) -> void:
 		_set_status(import_status, Game.t("custom.invalid_json"), false)
 		return
 	if f.get_length() > QuizImport.MAX_IMPORT_BYTES:
-		_set_status(import_status, Game.t("custom.invalid_json"), false)
+		_set_status(import_status, Game.t("custom.file_too_large") % (QuizImport.MAX_IMPORT_BYTES / 1000000), false)
 		return
 	var raw := f.get_as_text()
 	import_text.text = raw
@@ -214,7 +225,7 @@ func _on_import_pressed() -> void:
 		_set_status(import_status, Game.t("custom.name_required"), false)
 		return
 	if import_text.text.length() > QuizImport.MAX_IMPORT_BYTES:
-		_set_status(import_status, Game.t("custom.invalid_json"), false)
+		_set_status(import_status, Game.t("custom.file_too_large") % (QuizImport.MAX_IMPORT_BYTES / 1000000), false)
 		return
 	var data = JSON.parse_string(import_text.text)
 	if data == null:
@@ -285,7 +296,7 @@ func _make_add_panel() -> PanelContainer:
 	var add_btn := Button.new()
 	add_btn.text = Game.t("custom.add_btn")
 	add_btn.add_theme_font_size_override("font_size", UITheme.fs(16))
-	UITheme.style_button(add_btn, UITheme.ACCENT.darkened(0.3))
+	UITheme.style_button(add_btn, UITheme.ACCENT.darkened(0.4))
 	add_btn.pressed.connect(_on_add_pressed)
 	box.add_child(add_btn)
 
