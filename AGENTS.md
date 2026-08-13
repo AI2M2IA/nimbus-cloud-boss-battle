@@ -4,7 +4,7 @@ Instructions for any AI agent (and any human contributor) working in this reposi
 
 ## Identity Policy (MANDATORY)
 
-- Every commit and tag uses **exclusively** `AI(2)M(2)IA <AI2M2IA@users.noreply.github.com>` as both author AND committer.
+- Every commit and tag uses **exclusively** `AI(2)M(2)IA` as both author AND committer, with the GitHub-suggested no-reply email `286691643+AI2M2IA@users.noreply.github.com`.
 - It is **forbidden** for the author's real name or any personal email address to appear anywhere — in commit metadata, tags, commit messages, file contents, code comments, or game text. Never.
 - **Double check, always:** before any commit run `git config user.name && git config user.email` and confirm the pseudonymous identity; after committing, verify with `git log -1 --format='%an <%ae> | %cn <%ce>'`. If the identity is wrong, stop and fix it before doing anything else.
 
