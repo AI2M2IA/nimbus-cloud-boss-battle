@@ -69,7 +69,7 @@ UI strings are translated through flat JSON files in `data/i18n/`, with `en.json
 
 The test suite enforces translation health: every language file must load, match `en.json`'s key set exactly, and keep format placeholders (`%d`, `%s`, `%.1f`) in the same order as English. To add a language: create `data/i18n/<code>.json` with all keys and add the entry to `LANGS`.
 
-Script-coverage note: subsetted Noto fonts for the CJK, Arabic, Hebrew, Indic, and Thai locales ship in `assets/fonts/` and are chained as the theme's fallback font (`scripts/ui_fonts.gd`), so those scripts render on every platform — including Web exports, which have no system fonts.
+Script-coverage note: subsetted Noto fonts for the CJK, Arabic, Hebrew, Indic, Thai, and UI-symbol ranges ship in `fonts/` and are chained by `fonts/notosans_fallback.tres`, the project's single global fallback font. Those scripts render on every platform — including Web exports, which have no system fonts.
 
 ## Accessibility
 
@@ -122,7 +122,7 @@ godot.sh                # local Godot shortcut; no args runs this project
 data/questions.json     # question bank (662 questions, SAA-C03 domains)
 data/flashcards.json    # 186 Leitner flashcards (from the book)
 data/i18n/              # UI translations (en.json fallback + 18 locales)
-assets/fonts/           # subsetted Noto fallback fonts for non-Latin scripts
+fonts/                  # single licensed Noto fallback chain, including UI symbols
 scenes/                 # minimal scenes; UI is built in code
 scripts/game_state.gd   # autoload: question bank, battles, modes, i18n, save data
 scripts/main_menu.gd    # boss select, game modes, language picker
@@ -138,7 +138,6 @@ scripts/flashcards.gd   # Leitner flashcard review screen
 scripts/review_scheduler.gd # pure Leitner spaced-repetition rules (unit-tested)
 scripts/pet_avatar.gd   # animated cartoon pet renderer for Save the Pet
 scripts/ui_theme.gd     # shared styles (no art assets needed)
-scripts/ui_fonts.gd     # fallback font chain for the Web export
 scripts/ui/dialog_view.gd # shared modal dialog (resume/leave/abandon)
 scripts/ui/quiz_question_view.gd # shared question UI (boss + extra modes)
 scripts/ui/score_row.gd # shared score-recording UI
