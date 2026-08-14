@@ -35,8 +35,8 @@ jobs:
       GODOT_TEMPLATES_SHA256: "3fbe2c0e2dec9d537ab9ec97bcf8da91dcf23357fc51f67092dd068d839290a8"
       # Pinned rcodesign (apple-codesign) release + its verified sha256 — see
       # the signing step below for why this isn't resolved dynamically.
-      RCODESIGN_VERSION: "0.29.0"
-      RCODESIGN_ARCHIVE_SHA256: "dbe85cedd8ee4217b64e9a0e4c2aef92ab8bcaaa41f20bde99781ff02e600002"
+      APPLE_CODESIGN_VERSION: "0.29.0"
+      APPLE_CODESIGN_ARCHIVE_SHA256: "dbe85cedd8ee4217b64e9a0e4c2aef92ab8bcaaa41f20bde99781ff02e600002"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -181,12 +181,13 @@ jobs:
           # to the release artifacts. Bump the version/checksum deliberately —
           # download the new asset, inspect it, compute its sha256 — when a
           # newer rcodesign is actually needed.
-          asset="apple-codesign-${RCODESIGN_VERSION}-x86_64-unknown-linux-musl.tar.gz"
-          url="https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F${RCODESIGN_VERSION}/${asset}"
+          asset="apple-codesign-${APPLE_CODESIGN_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          url="https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F${APPLE_CODESIGN_VERSION}/${asset}"
           curl -fsSL -o rcodesign.tar.gz "$url"
-          # Avoid RCODESIGN_* names for checksum-only variables: rcodesign
-          # interprets that prefix as command configuration.
-          echo "${RCODESIGN_ARCHIVE_SHA256}  rcodesign.tar.gz" | sha256sum -c -
+          # Avoid RCODESIGN_* environment names entirely: rcodesign interprets
+          # that prefix as command configuration, including otherwise harmless
+          # version and checksum variables.
+          echo "${APPLE_CODESIGN_ARCHIVE_SHA256}  rcodesign.tar.gz" | sha256sum -c -
           mkdir -p _tools/rcodesign
           tar -xzf rcodesign.tar.gz -C _tools/rcodesign
           rc="$(find _tools/rcodesign -type f -name rcodesign -print -quit)"
