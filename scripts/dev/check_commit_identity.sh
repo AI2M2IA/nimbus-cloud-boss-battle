@@ -2,10 +2,8 @@
 # Enforce the repository Identity Policy in CI. Every commit in RANGE must keep
 # the project pseudonym in its authored metadata and must never carry a real
 # name or a personal e-mail. GitHub's own PR-merge identity is tolerated as a
-# committer. The official Dependabot identity is accepted only when CI passes
-# --allow-dependabot after independently validating the event actor, branch,
-# and source repository, or --allow-dependabot-sha after cryptographically
-# verifying that exact commit through GitHub's API.
+# committer. The official Dependabot identity is accepted only for exact SHAs
+# that CI has cryptographically verified through GitHub's API.
 set -euo pipefail
 
 EXPECTED_NAME="AI(2)M(2)IA"
@@ -14,7 +12,7 @@ DEPENDABOT_NAME='dependabot[bot]'
 DEPENDABOT_EMAIL_RE='^49699333[+]dependabot\[bot\]@users[.]noreply[.]github[.]com$'
 
 usage() {
-	echo "usage: check_commit_identity.sh <git-range> [--allow-dependabot] [--allow-dependabot-sha <sha>]..." >&2
+	echo "usage: check_commit_identity.sh <git-range> [--allow-dependabot-sha <sha>]..." >&2
 }
 
 RANGE="${1:-}"
@@ -24,14 +22,9 @@ if [ -z "$RANGE" ]; then
 fi
 shift
 
-allow_dependabot=0
 allowed_dependabot_shas=()
 while [ "$#" -gt 0 ]; do
 	case "$1" in
-		--allow-dependabot)
-			allow_dependabot=1
-			shift
-			;;
 		--allow-dependabot-sha)
 			if [ "$#" -lt 2 ] || [[ ! "$2" =~ ^[0-9a-f]{40}$ ]]; then
 				usage
@@ -54,7 +47,6 @@ ok_pseudonym() {  # name email
 dependabot_sha_allowed() {  # sha
 	local candidate="$1"
 	local allowed_sha
-	[ "$allow_dependabot" -eq 1 ] && return 0
 	for allowed_sha in "${allowed_dependabot_shas[@]}"; do
 		[ "$candidate" = "$allowed_sha" ] && return 0
 	done

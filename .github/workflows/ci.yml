@@ -51,37 +51,28 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          EVENT_NAME: ${{ github.event_name }}
           GH_TOKEN: ${{ github.token }}
-          # This is the only path that enables the checker's narrowly scoped
-          # automation identity. A branch name alone is never sufficient.
-          ALLOW_DEPENDABOT: ${{ github.event_name == 'pull_request' && github.actor == 'dependabot[bot]' && startsWith(github.head_ref, 'dependabot/') && github.event.pull_request.head.repo.full_name == github.repository }}
         run: |
           set -euo pipefail
           if [ -z "${BASE_SHA:-}" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
             BASE_SHA="$(git rev-list --max-parents=0 "$HEAD_SHA" | tail -1)"
           fi
           identity_args=()
-          if [ "$ALLOW_DEPENDABOT" = "true" ]; then
-            identity_args+=(--allow-dependabot)
-          fi
-          # A Dependabot commit already validated in its PR appears again in
-          # BASE_SHA..HEAD_SHA after a merge. On push, authorize only the exact
+          # Event actors are not a trust signal: a maintainer may synchronize
+          # an official Dependabot PR. In every event, authorize only the exact
           # SHA whose GitHub API record proves the official bot identity and a
           # valid signature. API errors and incomplete/untrusted responses fail
           # closed: no SHA is added and the identity checker rejects the bot.
-          if [ "$EVENT_NAME" = "push" ]; then
-            while IFS=$'\t' read -r sha author_name author_email; do
-              if [ "$author_name" != "dependabot[bot]" ] \
-                  || [ "$author_email" != "49699333+dependabot[bot]@users.noreply.github.com" ]; then
-                continue
-              fi
-              if gh api "repos/${GITHUB_REPOSITORY}/commits/${sha}" \
-                  | python3 scripts/dev/verify_dependabot_commit.py "$sha"; then
-                identity_args+=(--allow-dependabot-sha "$sha")
-              fi
-            done < <(git log --format=$'%H\t%an\t%ae' "${BASE_SHA}..${HEAD_SHA}")
-          fi
+          while IFS=$'\t' read -r sha author_name author_email; do
+            if [ "$author_name" != "dependabot[bot]" ] \
+                || [ "$author_email" != "49699333+dependabot[bot]@users.noreply.github.com" ]; then
+              continue
+            fi
+            if gh api "repos/${GITHUB_REPOSITORY}/commits/${sha}" \
+                | python3 scripts/dev/verify_dependabot_commit.py "$sha"; then
+              identity_args+=(--allow-dependabot-sha "$sha")
+            fi
+          done < <(git log --format=$'%H\t%an\t%ae' "${BASE_SHA}..${HEAD_SHA}")
           bash scripts/dev/check_commit_identity.sh "${BASE_SHA}..${HEAD_SHA}" "${identity_args[@]}"
 
       - name: Set up Python
