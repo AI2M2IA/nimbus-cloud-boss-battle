@@ -902,8 +902,11 @@ func _test_text_scale() -> void:
 func _test_responsive_layout() -> void:
 	print("[responsive_layout]")
 	check(UILayout.responsive_columns(390.0, 280.0, 3, 40.0) == 1, "phone portrait uses one card column")
+	check(UILayout.responsive_columns(944.0, 280.0, 3, 96.0, 18.0, 3.0) == 1, "HiDPI phone uses CSS-width breakpoints")
 	check(UILayout.responsive_columns(768.0, 280.0, 3, 64.0) == 2, "tablet portrait uses two card columns")
+	check(UILayout.responsive_columns(1536.0, 280.0, 3, 64.0, 18.0, 2.0) == 2, "HiDPI tablet matches its logical width")
 	check(UILayout.responsive_columns(1280.0, 280.0, 3, 96.0) == 3, "desktop uses three card columns")
+	check(UILayout.responsive_columns(2560.0, 280.0, 3, 96.0, 18.0, 2.0) == 3, "HiDPI desktop keeps three columns")
 
 # ------------------------------------------------------------------- branding
 
