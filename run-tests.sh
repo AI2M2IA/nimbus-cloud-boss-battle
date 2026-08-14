@@ -5,6 +5,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 scripts/dev/static_audit.py
+bash scripts/dev/test_commit_identity.sh
 python3 -m unittest discover -s tests -p 'test_*.py'
 mkdir -p user-data/home
 mkdir -p "$PWD/user-data/home/Library/Application Support"
