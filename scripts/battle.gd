@@ -11,6 +11,7 @@ const VICTORY_BONUS := 500
 
 var battle: Dictionary
 var queue: Array = []
+var battle_pool_ids: Array = []
 var total_unique: int = 0
 var correct_done: int = 0
 var attempted: Dictionary = {}
@@ -58,6 +59,8 @@ func _ready() -> void:
 	var checkpoint: Dictionary = Game.battle_checkpoint(String(battle["id"]))
 	if checkpoint.is_empty():
 		queue = Game.questions_for_battle(String(battle["id"]))
+		for q in queue:
+			battle_pool_ids.append(String(q.get("id", "")))
 		total_unique = queue.size()
 		if queue.is_empty():
 			# Empty pool (e.g. questions.json failed to load): show an error
@@ -280,6 +283,11 @@ func _restore_checkpoint(checkpoint: Dictionary) -> void:
 	queue = []
 	for qid in checkpoint["queue"]:
 		queue.append(by_id[qid])
+	battle_pool_ids = checkpoint["pool"].duplicate()
+	attempted = {}
+	for qid in checkpoint["attempted"]:
+		attempted[qid] = true
+	first_try_correct = int(checkpoint["first_try_correct"])
 	total_unique = int(checkpoint["total"])
 	hearts = int(checkpoint["hearts"])
 	correct_done = int(checkpoint["correct"])
@@ -305,7 +313,8 @@ func _write_checkpoint() -> void:
 	if ids.is_empty():
 		return
 	Game.save_battle_checkpoint(String(battle["id"]), Rules.make_checkpoint(
-		ids, hearts, correct_done, questions_seen, streak, best_streak, xp_earned, total_unique))
+		ids, hearts, correct_done, questions_seen, streak, best_streak, xp_earned,
+		total_unique, attempted.keys(), first_try_correct, battle_pool_ids))
 
 
 ## Shown instead of the battle UI when the question pool came back empty

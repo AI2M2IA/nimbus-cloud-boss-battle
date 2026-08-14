@@ -12,20 +12,15 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
-    name: Export Web and deploy to Pages
+  build:
+    name: Test and export Web
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     env:
       GODOT_VERSION: "4.6.3"
       # Pinned sha256 of the exact assets the URLs below point to
@@ -85,6 +80,9 @@ jobs:
           html/export_icon=true
           CFG
 
+      - name: Static audit + test suite
+        run: GODOT="$PWD/godot" ./run-tests.sh
+
       - name: Export Web build
         run: |
           set -euo pipefail
@@ -99,6 +97,18 @@ jobs:
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
           path: build/web
+
+  deploy:
+    name: Deploy to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
 
       - name: Deploy to GitHub Pages
         id: deploy

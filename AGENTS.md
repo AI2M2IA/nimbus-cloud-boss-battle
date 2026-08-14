@@ -30,6 +30,12 @@ Godot 4.6, GDScript. Keep pure game logic in RefCounted modules with static func
 
 Don't call `godot --headless --path . -s tests/run_tests.gd` directly. The wrapper does three things a bare invocation skips: imports assets first (required on a clean checkout — the project-wide default font loads before Godot's on-demand import path kicks in, so a never-imported project fails with a Parse Error instead of running), isolates `HOME` so the run doesn't touch your real Godot editor settings, and greps the run's own log for script compile/parse errors that Godot's exit code alone doesn't always catch. Exits 0 on success, 1 on failure — CI-friendly.
 
+## Branch flow
+
+- Feature and maintenance branches target `develop`.
+- Only `develop` targets `main`, as a release/promotion pull request.
+- Never open a feature branch directly against `main`; CI enforces this rule.
+
 ## Localization
 
 The reference locale set is the AWS book's language set: English plus zh, hi, es, fr, ar, bn, pt, ru, ur, id, de, ja, sw, tr, vi, ko, th, he. Align `LANGS` and `data/i18n/` to this set; add translation files progressively and show only languages whose file exists.

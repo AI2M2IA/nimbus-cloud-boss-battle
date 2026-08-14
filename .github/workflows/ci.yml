@@ -7,7 +7,7 @@ name: CI
 
 on:
   push:
-    branches: [main, develop, "feature/**"]
+    branches: [main, develop, "feature/**", "agent/**"]
   pull_request:
     branches: [main, develop]
 
@@ -35,6 +35,17 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+
+      - name: Enforce develop-to-main promotion flow
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          if [ "$BASE_BRANCH" = "main" ] && [ "$HEAD_BRANCH" != "develop" ]; then
+            echo "Pull requests into main must come from develop; feature branches target develop." >&2
+            exit 1
+          fi
 
       - name: Enforce commit identity (pseudonym only)
         env:

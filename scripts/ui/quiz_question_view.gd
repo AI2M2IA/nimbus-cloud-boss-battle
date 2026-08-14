@@ -28,6 +28,7 @@ var current_q: Dictionary = {}
 var selected_keys: Array = []
 var answered: bool = false
 var option_buttons: Dictionary = {}
+var option_order: Array = []
 
 var scroll: ScrollContainer
 var badge_label: Label
@@ -127,6 +128,7 @@ func show_question(question: Dictionary, badge_suffix: String = "") -> void:
 	selected_keys = []
 	answered = false
 	option_buttons = {}
+	option_order = []
 
 	var is_two: bool = String(question.get("type", "single")) == "select_two"
 	var badge := Game.t("battle.select_two") if is_two else Game.t("battle.pick_one")
@@ -155,6 +157,7 @@ func show_question(question: Dictionary, badge_suffix: String = "") -> void:
 			btn.pressed.connect(_on_option_pressed.bind(key))
 		options_box.add_child(btn)
 		option_buttons[key] = btn
+		option_order.append(key)
 
 	confirm_btn.visible = is_two
 	confirm_btn.disabled = true
@@ -243,7 +246,8 @@ func _on_continue_pressed() -> void:
 
 # ------------------------------------------------------------- keyboard input
 
-## A-D / 1-4 pick an option, Enter/Space confirms (select_two) or continues
+## A-L pick a matching canonical option; 1-9 pick by displayed position.
+## Enter/Space confirms (select_two) or continues
 ## (once answered). Routed through the real Button objects rather than
 ## calling the internal handlers directly, so toggle-mode visuals for
 ## select_two questions stay in sync with the logical selection -- calling
@@ -272,14 +276,43 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _option_key_for_keycode(keycode: int) -> String:
 	match keycode:
-		KEY_A, KEY_1:
+		KEY_A:
 			return "A"
-		KEY_B, KEY_2:
+		KEY_B:
 			return "B"
-		KEY_C, KEY_3:
+		KEY_C:
 			return "C"
-		KEY_D, KEY_4:
+		KEY_D:
 			return "D"
+		KEY_E:
+			return "E"
+		KEY_F:
+			return "F"
+		KEY_G:
+			return "G"
+		KEY_H:
+			return "H"
+		KEY_I:
+			return "I"
+		KEY_J:
+			return "J"
+		KEY_K:
+			return "K"
+		KEY_L:
+			return "L"
+	var index := -1
+	match keycode:
+		KEY_1: index = 0
+		KEY_2: index = 1
+		KEY_3: index = 2
+		KEY_4: index = 3
+		KEY_5: index = 4
+		KEY_6: index = 5
+		KEY_7: index = 6
+		KEY_8: index = 7
+		KEY_9: index = 8
+	if index >= 0 and index < option_order.size():
+		return String(option_order[index])
 	return ""
 
 

@@ -227,7 +227,7 @@ func _on_import_pressed() -> void:
 	if set_name == "":
 		_set_status(import_status, Game.t("custom.name_required"), false)
 		return
-	if import_text.text.length() > QuizImport.MAX_IMPORT_BYTES:
+	if QuizImport.utf8_size(import_text.text) > QuizImport.MAX_IMPORT_BYTES:
 		_set_status(import_status, Game.t("custom.file_too_large") % (QuizImport.MAX_IMPORT_BYTES / 1000000), false)
 		return
 	var data = JSON.parse_string(import_text.text)
@@ -239,7 +239,9 @@ func _on_import_pressed() -> void:
 	if not verdict["ok"]:
 		_set_status(import_status, "\n".join(verdict["errors"]), false)
 		return
-	Game.save_custom_set(set_name, bank["questions"])
+	if Game.save_custom_set(set_name, bank["questions"]) == "":
+		_set_status(import_status, Game.t("custom.name_required"), false)
+		return
 	_set_status(import_status, Game.t("custom.import_ok") % [int(verdict["count"]), set_name], true)
 	_refresh_pool_list()
 
