@@ -5,7 +5,6 @@ extends Node
 const QuizImport := preload("res://scripts/quiz_import.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd")
 const BattleRules := preload("res://scripts/battle_rules.gd")
-const UIFontsScript := preload("res://scripts/ui_fonts.gd")
 
 const QUESTIONS_PATH := "res://data/questions.json"
 const SAVE_PATH := "user://save.json"
@@ -16,6 +15,7 @@ const TEXT_SCALE_STEP := 0.15
 const CUSTOM_SETS_PATH := "user://custom_sets.json"
 const LEADERBOARD_PATH := "user://leaderboard.json"
 const GATEKEEPER_SAMPLE_PER_DOMAIN := 2
+const MAX_PERSISTED_FILE_BYTES := 4000000
 
 ## Boss names stay in English in every locale (creative proper nouns, same
 ## policy as AWS service names); subtitles are localized via subtitle_key.
@@ -145,10 +145,6 @@ var custom_sets: Array = []
 var leaderboard_entries: Array = []
 var _strings: Dictionary = {}
 var _fallback: Dictionary = {}
-## Theme carrying the bundled Noto fallback-font chain, applied to every
-## scene root via setup_scene_root(). Without it the Web export (which ships
-## no system fonts) renders CJK/Arabic/Indic/Thai locales as tofu.
-var ui_theme: Theme = Theme.new()
 
 
 func _ready() -> void:
@@ -165,15 +161,11 @@ func _ready() -> void:
 		# into a res:// path by _load_lang_file) — fall back to English.
 		lang = "en"
 	_strings = _fallback if lang == "en" else _load_lang_file(lang)
-	var fallback_font := UIFontsScript.build_fallback_font()
-	if fallback_font != null:
-		ui_theme.default_font = fallback_font
 
 
-## Shared per-scene setup: the fallback-font theme plus RTL layout for
-## right-to-left locales. Call once at the top of each scene root's _ready.
+## Shared per-scene setup for right-to-left locales. The single bundled font
+## chain is configured globally through project.godot.
 func setup_scene_root(scene_root: Control) -> void:
-	scene_root.theme = ui_theme
 	if RTL_LANGS.has(lang):
 		scene_root.layout_direction = Control.LAYOUT_DIRECTION_RTL
 
@@ -254,6 +246,25 @@ func questions_for_battle(id: String) -> Array:
 	return pool
 
 
+## All question ids that could legally belong to a battle, without sampling
+## or shuffling. Checkpoint validation uses this stable superset so validating
+## a randomized Gatekeeper run never performs a second, incompatible draw.
+func eligible_question_ids_for_battle(id: String) -> Dictionary:
+	var battle := get_battle(id)
+	var ids := {}
+	for q in questions:
+		var eligible := false
+		if id == "gauntlet":
+			eligible = String(q.get("source", "")) == "exam"
+		elif id == "d0":
+			eligible = int(q.get("domain", -99)) in [0, 1, 2, 3, 4]
+		else:
+			eligible = int(q.get("domain", -99)) == int(battle["domain"])
+		if eligible:
+			ids[String(q.get("id", ""))] = true
+	return ids
+
+
 func get_mode(id: String) -> Dictionary:
 	for m in MODES:
 		if m["id"] == id:
@@ -297,6 +308,8 @@ func get_custom_set(id: String) -> Dictionary:
 ## already validated with QuizImport.validate_bank. Returns the set id.
 func save_custom_set(set_name: String, new_questions: Array) -> String:
 	var clean_name := _sanitize_set_name(set_name)
+	if clean_name == "":
+		return ""
 	var id := _custom_set_id(clean_name)
 	var existing := get_custom_set(id)
 	if existing.is_empty():
@@ -325,6 +338,8 @@ func _sanitize_set_name(set_name: String) -> String:
 ## Returns the QuizImport.validate_bank verdict for the resulting set.
 func append_to_custom_set(set_name: String, question: Dictionary) -> Dictionary:
 	var clean_name := _sanitize_set_name(set_name)
+	if clean_name == "":
+		return {"ok": false, "errors": ["The set name is empty after sanitization."], "count": 0}
 	var id := _custom_set_id(clean_name)
 	var set_data := get_custom_set(id)
 	var qs: Array = (set_data.get("questions", []) as Array).duplicate()
@@ -376,12 +391,7 @@ func _write_custom_sets() -> void:
 
 func _load_custom_sets() -> void:
 	custom_sets = []
-	if not FileAccess.file_exists(CUSTOM_SETS_PATH):
-		return
-	var f := FileAccess.open(CUSTOM_SETS_PATH, FileAccess.READ)
-	if f == null:
-		return
-	var data = JSON.parse_string(f.get_as_text())
+	var data = _read_json_file(CUSTOM_SETS_PATH, MAX_PERSISTED_FILE_BYTES)
 	if typeof(data) == TYPE_DICTIONARY and typeof(data.get("sets")) == TYPE_ARRAY:
 		custom_sets = _sanitize_custom_sets(data["sets"])
 
@@ -395,7 +405,8 @@ func _sanitize_custom_sets(raw: Array) -> Array:
 	for item in raw:
 		if typeof(item) != TYPE_DICTIONARY:
 			continue
-		var sid := String((item as Dictionary).get("id", "")).strip_edges()
+		var clean_name := _sanitize_set_name(String((item as Dictionary).get("name", "")))
+		var sid := _custom_set_id(clean_name) if clean_name != "" else ""
 		var qs = (item as Dictionary).get("questions", [])
 		if sid == "" or seen.has(sid) or typeof(qs) != TYPE_ARRAY:
 			continue
@@ -404,7 +415,7 @@ func _sanitize_custom_sets(raw: Array) -> Array:
 		seen[sid] = true
 		clean.append({
 			"id": sid,
-			"name": String((item as Dictionary).get("name", "")).strip_edges(),
+			"name": clean_name,
 			"questions": qs,
 		})
 	return clean
@@ -440,12 +451,7 @@ func _write_leaderboard() -> void:
 
 func _load_leaderboard() -> void:
 	leaderboard_entries = []
-	if not FileAccess.file_exists(LEADERBOARD_PATH):
-		return
-	var f := FileAccess.open(LEADERBOARD_PATH, FileAccess.READ)
-	if f == null:
-		return
-	var data = JSON.parse_string(f.get_as_text())
+	var data = _read_json_file(LEADERBOARD_PATH, MAX_PERSISTED_FILE_BYTES)
 	if typeof(data) == TYPE_DICTIONARY and typeof(data.get("entries")) == TYPE_ARRAY:
 		leaderboard_entries = Leaderboard.sort_entries(Leaderboard.sanitize_entries(data["entries"]))
 
@@ -501,9 +507,7 @@ func battle_checkpoint(id: String) -> Dictionary:
 	var rec: Dictionary = battle_record(id)
 	if not rec.has("in_progress"):
 		return {}
-	var bank_ids := {}
-	for q in questions_for_battle(id):
-		bank_ids[String(q.get("id", ""))] = true
+	var bank_ids := eligible_question_ids_for_battle(id)
 	var checkpoint: Dictionary = BattleRules.validate_checkpoint(rec["in_progress"], bank_ids)
 	if checkpoint.is_empty():
 		clear_battle_checkpoint(id)
@@ -582,17 +586,26 @@ static func _write_json_atomic(path: String, text: String) -> void:
 		push_error("Could not finalize %s (rename error %d)" % [path, err])
 
 
+## Persisted user files are untrusted and can be hand-edited. Reject an
+## unexpectedly large file before allocating and parsing its entire body.
+static func _read_json_file(path: String, max_bytes: int):
+	if not FileAccess.file_exists(path):
+		return null
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return null
+	if f.get_length() > max_bytes:
+		push_warning("Ignoring oversized persisted file: " + path)
+		return null
+	return JSON.parse_string(f.get_as_text())
+
+
 func _write_save() -> void:
 	_write_json_atomic(SAVE_PATH, JSON.stringify(save_data))
 
 
 func _load_save() -> void:
-	if not FileAccess.file_exists(SAVE_PATH):
-		return
-	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
-	if f == null:
-		return
-	var data = JSON.parse_string(f.get_as_text())
+	var data = _read_json_file(SAVE_PATH, MAX_PERSISTED_FILE_BYTES)
 	if typeof(data) == TYPE_DICTIONARY:
 		save_data = _sanitize_save_data(data)
 
@@ -602,20 +615,92 @@ func _load_save() -> void:
 ## there — a wrong type used to surface as script errors at startup.
 func _sanitize_save_data(raw: Dictionary) -> Dictionary:
 	var clean: Dictionary = {"xp": 0, "battles": {}}
-	var xp = raw.get("xp")
-	if (typeof(xp) == TYPE_INT or typeof(xp) == TYPE_FLOAT) and float(xp) >= 0.0:
-		clean["xp"] = int(float(xp))
-	for key in ["battles", "modes"]:
-		if typeof(raw.get(key)) == TYPE_DICTIONARY:
-			clean[key] = raw[key]
+	clean["xp"] = _safe_nonnegative_int(raw.get("xp"))
+	if typeof(raw.get("battles")) == TYPE_DICTIONARY:
+		clean["battles"] = _sanitize_battle_records(raw["battles"])
+	if typeof(raw.get("modes")) == TYPE_DICTIONARY:
+		clean["modes"] = _sanitize_mode_records(raw["modes"])
 	if typeof(raw.get("review_cards")) == TYPE_ARRAY:
-		clean["review_cards"] = raw["review_cards"]
+		clean["review_cards"] = _sanitize_review_cards(raw["review_cards"])
 	var ts = raw.get("text_scale")
-	if typeof(ts) == TYPE_INT or typeof(ts) == TYPE_FLOAT:
+	if (typeof(ts) == TYPE_INT or typeof(ts) == TYPE_FLOAT) and is_finite(float(ts)):
 		clean["text_scale"] = clampf(float(ts), TEXT_SCALE_MIN, TEXT_SCALE_MAX)
-	for key in ["lang", "active_set", "player_name"]:
-		if typeof(raw.get(key)) == TYPE_STRING:
-			clean[key] = raw[key]
+	var saved_lang := String(raw.get("lang", "")) if typeof(raw.get("lang")) == TYPE_STRING else ""
+	if _is_known_lang(saved_lang):
+		clean["lang"] = saved_lang
+	var active_set := String(raw.get("active_set", "")) if typeof(raw.get("active_set")) == TYPE_STRING else ""
+	if active_set.length() <= 200 and not QuizImport.has_unsafe_chars(active_set):
+		clean["active_set"] = active_set
+	if typeof(raw.get("player_name")) == TYPE_STRING:
+		var player_name := Leaderboard.sanitize_name(String(raw["player_name"]))
+		if player_name != Leaderboard.FALLBACK_NAME:
+			clean["player_name"] = player_name
+	return clean
+
+
+static func _safe_nonnegative_int(value, upper_bound: int = 2147483647) -> int:
+	if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
+		return 0
+	var number := float(value)
+	if not is_finite(number) or number < 0.0 or number != floorf(number):
+		return 0
+	return mini(int(number), upper_bound)
+
+
+func _sanitize_battle_records(raw: Dictionary) -> Dictionary:
+	var clean := {}
+	for battle in BATTLES:
+		var id := String(battle["id"])
+		if typeof(raw.get(id)) != TYPE_DICTIONARY:
+			continue
+		var source: Dictionary = raw[id]
+		var rec := {
+			"defeated": bool(source.get("defeated", false)) if typeof(source.get("defeated")) == TYPE_BOOL else false,
+			"best_accuracy": 0.0,
+			"best_streak": _safe_nonnegative_int(source.get("best_streak"), 1000000),
+			"attempts": _safe_nonnegative_int(source.get("attempts"), 1000000),
+		}
+		var accuracy = source.get("best_accuracy")
+		if (typeof(accuracy) == TYPE_INT or typeof(accuracy) == TYPE_FLOAT) and is_finite(float(accuracy)):
+			rec["best_accuracy"] = clampf(float(accuracy), 0.0, 1.0)
+		if typeof(source.get("in_progress")) == TYPE_DICTIONARY:
+			rec["in_progress"] = (source["in_progress"] as Dictionary).duplicate(true)
+		clean[id] = rec
+	return clean
+
+
+func _sanitize_mode_records(raw: Dictionary) -> Dictionary:
+	var clean := {}
+	for mode in MODES:
+		var id := String(mode["id"])
+		if typeof(raw.get(id)) != TYPE_DICTIONARY:
+			continue
+		var source: Dictionary = raw[id]
+		clean[id] = {
+			"best_score": _safe_nonnegative_int(source.get("best_score"), 2147483647),
+			"attempts": _safe_nonnegative_int(source.get("attempts"), 1000000),
+		}
+	return clean
+
+
+func _sanitize_review_cards(raw: Array) -> Array:
+	var clean: Array = []
+	var seen := {}
+	for item in raw:
+		if clean.size() >= flashcards.size() or typeof(item) != TYPE_DICTIONARY:
+			continue
+		var question_id := String((item as Dictionary).get("question_id", "")).strip_edges()
+		if question_id == "" or question_id.length() > 200 or seen.has(question_id) \
+				or QuizImport.has_unsafe_chars(question_id):
+			continue
+		seen[question_id] = true
+		clean.append({
+			"question_id": question_id,
+			"domain": String((item as Dictionary).get("domain", "")).substr(0, 20),
+			"box": clampi(_safe_nonnegative_int((item as Dictionary).get("box")), 1, 4),
+			"last_seen_day": _safe_nonnegative_int((item as Dictionary).get("last_seen_day")),
+			"times_seen": _safe_nonnegative_int((item as Dictionary).get("times_seen"), 1000000),
+		})
 	return clean
 
 func _load_flashcards() -> void:

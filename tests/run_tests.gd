@@ -144,7 +144,9 @@ func _test_checkpoints() -> void:
 	print("[checkpoints]")
 	var bank := {"q1": true, "q2": true, "q3": true, "q4": true}
 
-	var cp := Rules.make_checkpoint(["q3", "q4"], 3, 2, 5, 1, 2, 1300, 4)
+	var cp := Rules.make_checkpoint(
+		["q3", "q4"], 3, 2, 5, 1, 2, 1300, 4,
+		["q1", "q2", "q3"], 1, ["q1", "q2", "q3", "q4"])
 	var ok := Rules.validate_checkpoint(cp, bank)
 	check(not ok.is_empty(), "a well-formed checkpoint validates")
 	check(ok.get("queue") == ["q3", "q4"], "queue order survives validation")
@@ -155,6 +157,9 @@ func _test_checkpoints() -> void:
 	check(int(ok.get("best_streak", -1)) == 2, "best_streak survives validation")
 	check(int(ok.get("xp_earned", -1)) == 1300, "xp survives validation")
 	check(int(ok.get("total", -1)) == 4, "total survives validation")
+	check(ok.get("attempted") == ["q1", "q2", "q3"], "attempted ids survive validation")
+	check(int(ok.get("first_try_correct", -1)) == 1, "first-attempt accuracy survives validation")
+	check(ok.get("pool") == ["q1", "q2", "q3", "q4"], "sampled pool survives validation")
 
 	# JSON round-trip turns every number into a float; integral floats must
 	# still validate (that is how a real save.json comes back).
@@ -163,7 +168,9 @@ func _test_checkpoints() -> void:
 
 	# best_streak predates nothing here, but an older save without the field
 	# must still be accepted, falling back to the current streak.
-	var legacy := Rules.make_checkpoint(["q3", "q4"], 3, 2, 5, 1, 1, 1300, 4)
+	var legacy := Rules.make_checkpoint(
+		["q3", "q4"], 3, 2, 5, 1, 1, 1300, 4,
+		["q1", "q2", "q3"], 1, ["q1", "q2", "q3", "q4"])
 	legacy.erase("best_streak")
 	var legacy_ok := Rules.validate_checkpoint(legacy, bank)
 	check(not legacy_ok.is_empty(), "a checkpoint without best_streak still validates")
@@ -171,37 +178,61 @@ func _test_checkpoints() -> void:
 
 	check(Rules.validate_checkpoint("garbage", bank).is_empty(), "a non-dictionary checkpoint is dropped")
 	check(Rules.validate_checkpoint({}, bank).is_empty(), "an empty checkpoint is dropped")
+	var before_answer := Rules.make_checkpoint(
+		["q1", "q2", "q3", "q4"], 3, 0, 1, 0, 0, 0, 4,
+		[], 0, ["q1", "q2", "q3", "q4"])
+	check(not Rules.validate_checkpoint(before_answer, bank).is_empty(), "leaving before the first answer preserves the sampled run")
 
-	var no_queue := Rules.make_checkpoint([], 3, 4, 4, 0, 0, 400, 4)
+	var no_queue := Rules.make_checkpoint(
+		[], 3, 4, 4, 0, 0, 400, 4,
+		["q1", "q2", "q3", "q4"], 4, ["q1", "q2", "q3", "q4"])
 	check(Rules.validate_checkpoint(no_queue, bank).is_empty(), "an empty queue is dropped")
 
-	var foreign := Rules.make_checkpoint(["q3", "zz"], 3, 2, 5, 1, 1, 1300, 4)
+	var foreign := Rules.make_checkpoint(
+		["q3", "zz"], 3, 2, 5, 1, 1, 1300, 4,
+		["q1", "q2", "q3"], 1, ["q1", "q2", "q3", "q4"])
 	check(Rules.validate_checkpoint(foreign, bank).is_empty(), "a queue id missing from the bank is dropped")
 
-	var dup := Rules.make_checkpoint(["q3", "q3"], 3, 2, 5, 1, 1, 1300, 4)
+	var dup := Rules.make_checkpoint(
+		["q3", "q3"], 3, 2, 5, 1, 1, 1300, 4,
+		["q1", "q2", "q3"], 1, ["q1", "q2", "q3", "q4"])
 	check(Rules.validate_checkpoint(dup, bank).is_empty(), "duplicate queue ids are dropped")
 
-	var dead := Rules.make_checkpoint(["q3", "q4"], 0, 2, 5, 1, 1, 1300, 4)
+	var dead := Rules.make_checkpoint(
+		["q3", "q4"], 0, 2, 5, 1, 1, 1300, 4,
+		["q1", "q2", "q3"], 1, ["q1", "q2", "q3", "q4"])
 	check(Rules.validate_checkpoint(dead, bank).is_empty(), "zero hearts is dropped")
 
-	var bad_math := Rules.make_checkpoint(["q3", "q4"], 3, 1, 5, 1, 1, 1300, 4)
+	var bad_math := Rules.make_checkpoint(
+		["q3", "q4"], 3, 1, 5, 1, 1, 1300, 4,
+		["q1", "q2", "q3"], 1, ["q1", "q2", "q3", "q4"])
 	check(Rules.validate_checkpoint(bad_math, bank).is_empty(), "correct + remaining != total is dropped")
 
-	var bad_answered := Rules.make_checkpoint(["q3", "q4"], 3, 2, 1, 1, 1, 1300, 4)
+	var bad_answered := Rules.make_checkpoint(
+		["q3", "q4"], 3, 2, 1, 1, 1, 1300, 4,
+		["q1", "q2", "q3"], 1, ["q1", "q2", "q3", "q4"])
 	check(Rules.validate_checkpoint(bad_answered, bank).is_empty(), "answered < correct is dropped")
 
-	var neg_xp := Rules.make_checkpoint(["q3", "q4"], 3, 2, 5, 1, 1, -100, 4)
+	var neg_xp := Rules.make_checkpoint(
+		["q3", "q4"], 3, 2, 5, 1, 1, -100, 4,
+		["q1", "q2", "q3"], 1, ["q1", "q2", "q3", "q4"])
 	check(Rules.validate_checkpoint(neg_xp, bank).is_empty(), "negative XP is dropped")
 
-	var wrong_type := Rules.make_checkpoint(["q3", "q4"], 3, 2, 5, 1, 1, 1300, 4)
+	var wrong_type := Rules.make_checkpoint(
+		["q3", "q4"], 3, 2, 5, 1, 1, 1300, 4,
+		["q1", "q2", "q3"], 1, ["q1", "q2", "q3", "q4"])
 	wrong_type["hearts"] = "three"
 	check(Rules.validate_checkpoint(wrong_type, bank).is_empty(), "a non-numeric field is dropped")
 
-	var fractional := Rules.make_checkpoint(["q3", "q4"], 3, 2, 5, 1, 1, 1300, 4)
+	var fractional := Rules.make_checkpoint(
+		["q3", "q4"], 3, 2, 5, 1, 1, 1300, 4,
+		["q1", "q2", "q3"], 1, ["q1", "q2", "q3", "q4"])
 	fractional["xp_earned"] = 1300.5
 	check(Rules.validate_checkpoint(fractional, bank).is_empty(), "a fractional float is dropped")
 
-	var low_best := Rules.make_checkpoint(["q3", "q4"], 3, 2, 5, 3, 1, 1300, 4)
+	var low_best := Rules.make_checkpoint(
+		["q3", "q4"], 3, 2, 5, 3, 1, 1300, 4,
+		["q1", "q2", "q3"], 1, ["q1", "q2", "q3", "q4"])
 	check(Rules.validate_checkpoint(low_best, bank).is_empty(), "best_streak below streak is dropped")
 
 
@@ -302,6 +333,7 @@ func _test_question_bank() -> void:
 	var bad_fields := 0
 	var bad_answers := 0
 	var bad_two := 0
+	var bad_why_nots := 0
 	for q in qs:
 		for field in ["id", "stem", "options", "answers", "type", "explanation", "domain"]:
 			if not q.has(field):
@@ -312,11 +344,16 @@ func _test_question_bank() -> void:
 		for a in q.get("answers", []):
 			if not keys.has(a):
 				bad_answers += 1
+		if typeof(q.get("whyNots")) == TYPE_DICTIONARY:
+			for why_key in q["whyNots"]:
+				if not keys.has(why_key) or q.get("answers", []).has(why_key):
+					bad_why_nots += 1
 		if String(q.get("type", "")) == "select_two" and q.get("answers", []).size() != 2:
 			bad_two += 1
 	check(bad_fields == 0, "all questions have required fields")
 	check(bad_answers == 0, "every answer key exists in options")
 	check(bad_two == 0, "select_two questions have exactly 2 answers")
+	check(bad_why_nots == 0, "distractor explanations follow their remapped option keys")
 
 	# Regression: the original supplemental batch (vpc-q00..09) had the
 	# correct answer on "A" in all 10 questions, with nothing here to catch
@@ -342,6 +379,25 @@ func _test_question_bank() -> void:
 		single_supplemental == 0 or max_share <= 0.6,
 		"supplemental answers aren't dominated by one letter (worst share %.0f%% of %d)"
 			% [max_share * 100.0, single_supplemental]
+	)
+
+	var exam_letter_counts := {"A": 0, "B": 0, "C": 0, "D": 0}
+	var single_exam := 0
+	for q in qs:
+		if String(q.get("source", "")) != "exam" or String(q.get("type", "")) != "single":
+			continue
+		single_exam += 1
+		var answer: Array = q.get("answers", [])
+		if answer.size() == 1 and exam_letter_counts.has(String(answer[0])):
+			exam_letter_counts[String(answer[0])] += 1
+	var exam_max_share := 0.0
+	for letter in exam_letter_counts:
+		if single_exam > 0:
+			exam_max_share = max(exam_max_share, float(exam_letter_counts[letter]) / float(single_exam))
+	check(
+		single_exam == 0 or exam_max_share <= 0.35,
+		"exam answers are balanced across A-D (worst share %.0f%% of %d)"
+			% [exam_max_share * 100.0, single_exam]
 	)
 
 	# Regression: questions.json carries a `counts` summary block (total /
@@ -415,6 +471,18 @@ func _test_game_state() -> void:
 	check(ids.size() == 6, "battle ids are unique")
 	check(gs.get_battle("nope")["id"] == "d0", "unknown battle falls back to d0")
 
+	var gatekeeper_pool := gs.questions_for_battle("d0")
+	var gatekeeper_ids: Array = []
+	for q in gatekeeper_pool:
+		gatekeeper_ids.append(String(q.get("id", "")))
+	var gatekeeper_checkpoint := Rules.make_checkpoint(
+		gatekeeper_ids.slice(1), 5, 1, 1, 1, 1, 100, gatekeeper_ids.size(),
+		[gatekeeper_ids[0]], 1, gatekeeper_ids)
+	gs.save_data = {"xp": 0, "battles": {"d0": {"in_progress": gatekeeper_checkpoint}}}
+	var restored_gatekeeper := gs.battle_checkpoint("d0")
+	check(not restored_gatekeeper.is_empty(), "Gatekeeper checkpoint validates without drawing a new random pool")
+	check(restored_gatekeeper["pool"] == gatekeeper_ids, "Gatekeeper keeps its exact sampled pool")
+
 	gs.save_data = {"xp": 0, "battles": {}}
 	gs._fallback = gs._load_lang_file("en")
 	check(gs.player_rank() == "Cloud Novice", "rank at 0 XP")
@@ -461,19 +529,27 @@ func _test_save_hardening() -> void:
 	# A hand-edited save with wrong types must not survive as-is.
 	var dirty := {
 		"xp": "lots",
-		"battles": ["not", "a", "dict"],
+		"battles": {
+			"d1": {"defeated": "yes", "best_accuracy": 9.0, "best_streak": -4, "attempts": "many"},
+			"unknown": {"defeated": true},
+		},
+		"modes": {"survival": {"best_score": -10, "attempts": 2.5}, "unknown": {"best_score": 999}},
 		"text_scale": 99.0,
 		"lang": "../../etc/passwd",
 		"unknown_key": 1,
-		"player_name": "  ok name  ",
+		"player_name": "  ok name" + char(0x202E) + "  ",
 	}
 	var clean: Dictionary = gs._sanitize_save_data(dirty)
 	check(int(clean.get("xp", -1)) == 0, "non-numeric XP resets to 0")
-	check(typeof(clean.get("battles")) == TYPE_DICTIONARY, "non-dict battles resets to {}")
+	check(typeof(clean.get("battles")) == TYPE_DICTIONARY, "battle records normalize to a dictionary")
 	check(is_equal_approx(float(clean.get("text_scale", -1.0)), gs.TEXT_SCALE_MAX), "text_scale clamps to max")
-	check(String(clean.get("lang", "")) == "../../etc/passwd", "lang string survives sanitizing...")
-	check(not gs._is_known_lang(String(clean.get("lang", ""))), "...but is not a known language...")
-	check(String(clean.get("player_name", "")) == "  ok name  ", "known string keys are kept")
+	check(not clean.has("lang"), "unknown saved language is dropped")
+	check(String(clean.get("player_name", "")) == "ok name", "saved player name is sanitized")
+	check(clean["battles"].has("d1") and not clean["battles"].has("unknown"), "only known battle ids survive")
+	check(is_equal_approx(float(clean["battles"]["d1"]["best_accuracy"]), 1.0), "battle accuracy clamps to 0..1")
+	check(int(clean["battles"]["d1"]["best_streak"]) == 0, "negative battle streak resets to zero")
+	check(clean["modes"].has("survival") and not clean["modes"].has("unknown"), "only known mode ids survive")
+	check(int(clean["modes"]["survival"]["best_score"]) == 0, "negative mode score resets to zero")
 	check(not clean.has("unknown_key"), "unknown keys are dropped")
 
 	# set_language rejects unknown codes instead of writing them to the save.
@@ -634,6 +710,21 @@ func _test_quiz_import() -> void:
 	domq["id"] = "dom1"
 	domq["domain"] = 99999
 	check(not QuizImport.validate_bank({"questions": [domq]})["ok"], "an out-of-range domain fails")
+	var fractional_domain: Dictionary = good.duplicate(true)
+	fractional_domain["id"] = "fractional-domain"
+	fractional_domain["domain"] = 1.5
+	check(not QuizImport.validate_bank({"questions": [fractional_domain]})["ok"], "a fractional domain fails")
+	var duplicate_answers: Dictionary = good.duplicate(true)
+	duplicate_answers["id"] = "duplicate-answers"
+	duplicate_answers["type"] = "select_two"
+	duplicate_answers["answers"] = ["A", "A"]
+	check(not QuizImport.validate_bank({"questions": [duplicate_answers]})["ok"], "duplicate answer keys fail")
+	var invalid_option_key: Dictionary = good.duplicate(true)
+	invalid_option_key["id"] = "invalid-option-key"
+	invalid_option_key["options"][0]["key"] = "../A"
+	invalid_option_key["answers"] = ["../A"]
+	check(not QuizImport.validate_bank({"questions": [invalid_option_key]})["ok"], "non-canonical option keys fail")
+	check(QuizImport.utf8_size("é") == 2, "import size uses UTF-8 bytes, not characters")
 
 
 # ---------------------------------------------------------------- leaderboard
@@ -695,8 +786,15 @@ func _test_custom_sets() -> void:
 	check(gs._sanitize_custom_sets([42, {"id": "", "name": "n", "questions": []}]).is_empty(), "load drops malformed and empty-id sets")
 	var keepq := QuizImport.build_question("k1", "stem", ["a", "b", "c", "d"], ["A"], "exp", 1)
 	var kept := gs._sanitize_custom_sets([{"id": "keep", "name": "Keep", "questions": [keepq]}])
-	check(kept.size() == 1 and kept[0]["id"] == "keep", "load keeps a set whose questions validate")
+	check(kept.size() == 1 and kept[0]["id"] == gs._custom_set_id("Keep"), "load keeps and canonicalizes a set whose questions validate")
 	check(gs._sanitize_custom_sets([{"id": "bad", "name": "Bad", "questions": [{"id": "x"}]}]).is_empty(), "load drops a set with invalid questions")
+	check(gs.save_custom_set(char(0x202E), [keepq]) == "", "a set name empty after sanitization is rejected")
+	var sanitized_name := gs._sanitize_custom_sets([{
+		"id": "spoofed",
+		"name": "Safe" + char(0x202E) + " Name",
+		"questions": [keepq],
+	}])
+	check(sanitized_name.size() == 1 and sanitized_name[0]["name"] == "Safe Name", "loaded set names strip unsafe formatting characters")
 	# Regression: the ASCII-only slug used to collapse different names to the
 	# same id and silently overwrite each other -- both a punctuation-only
 	# difference and, worse, any pair of non-Latin names (which used to both
@@ -792,6 +890,13 @@ func _test_text_scale() -> void:
 func _test_branding() -> void:
 	print("[branding]")
 	check(String(ProjectSettings.get_setting("application/config/name", "")) == "Nimbus Cloud Boss Battle", "project name is the official title")
+	var font_path := String(ProjectSettings.get_setting("gui/theme/custom_font", ""))
+	check(font_path == "res://fonts/notosans_fallback.tres", "project uses the single global fallback-font chain")
+	var fallback_font := load(font_path) as Font
+	check(fallback_font != null, "global fallback font loads")
+	if fallback_font != null:
+		check(fallback_font.has_char(0x25BC), "fallback font renders the overflow symbol")
+		check(fallback_font.has_char(0x2713) and fallback_font.has_char(0x2717), "fallback font renders correct/wrong markers")
 	var gs = GameState.new()
 	var bad := 0
 	for l in gs.LANGS:
@@ -917,6 +1022,21 @@ func _test_select_two_keyboard() -> void:
 		instance.queue_free()
 		return
 
+	var restore_pool: Array = _game_autoload().questions.slice(0, 4)
+	var restore_ids: Array = []
+	var restore_bank := {}
+	for q in restore_pool:
+		var restore_id := String(q.get("id", ""))
+		restore_ids.append(restore_id)
+		restore_bank[restore_id] = true
+	var restore_checkpoint := Rules.make_checkpoint(
+		[restore_ids[2], restore_ids[3]], 3, 2, 5, 1, 2, 1300, 4,
+		[restore_ids[0], restore_ids[1], restore_ids[2]], 1, restore_ids)
+	instance._restore_checkpoint(Rules.validate_checkpoint(restore_checkpoint, restore_bank))
+	check(instance.attempted.has(restore_ids[2]), "resume restores attempted ids for rematch semantics")
+	check(instance.first_try_correct == 1, "resume restores first-attempt accuracy")
+	check(instance.battle_pool_ids == restore_ids, "resume restores the exact sampled battle pool")
+
 	var question := {
 		"id": "test-select-two",
 		"type": "select_two",
@@ -970,6 +1090,32 @@ func _test_select_two_keyboard() -> void:
 	_press_key(view, KEY_ENTER)
 	await process_frame
 	check(_last_signal_payload == ["A", "C"], "select_two: Enter submits the current selection")
+
+	# The official exam bank contains E options, including correct E answers.
+	# Keyboard-only players must be able to select them by letter or position.
+	var e_question := {
+		"id": "test-option-e",
+		"type": "single",
+		"stem": "Synthetic five-option keyboard question.",
+		"options": [
+			{"key": "A", "text": "Option A"},
+			{"key": "B", "text": "Option B"},
+			{"key": "C", "text": "Option C"},
+			{"key": "D", "text": "Option D"},
+			{"key": "E", "text": "Option E"},
+		],
+		"answers": ["E"],
+	}
+	view.show_question(e_question)
+	_last_signal_payload = null
+	_press_key(view, KEY_E)
+	await process_frame
+	check(_last_signal_payload == ["E"], "single: E selects the fifth option by letter")
+	view.show_question(e_question)
+	_last_signal_payload = null
+	_press_key(view, KEY_5)
+	await process_frame
+	check(_last_signal_payload == ["E"], "single: 5 selects the fifth displayed option")
 
 	instance.queue_free()
 	_restore_file(GameState.SAVE_PATH, snap_save)

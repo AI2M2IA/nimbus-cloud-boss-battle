@@ -7,6 +7,7 @@ extends RefCounted
 const REQUIRED_FIELDS := ["id", "stem", "options", "answers", "type", "explanation", "domain"]
 const VALID_TYPES := ["single", "select_two"]
 const OPTION_KEYS := ["A", "B", "C", "D"]
+const ALLOWED_OPTION_KEYS := ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"]
 const MAX_REPORTED_ERRORS := 12
 const MAX_QUESTIONS := 1000
 const MAX_OPTIONS := 12
@@ -36,6 +37,10 @@ static func has_unsafe_chars(s: String) -> bool:
 		if cp == 0x200B or cp == 0x200E or cp == 0x200F or cp == 0xFEFF:
 			return true
 	return false
+
+
+static func utf8_size(s: String) -> int:
+	return s.to_utf8_buffer().size()
 
 
 ## Coerce a raw parsed JSON value into the canonical {questions: [...]} shape.
@@ -120,6 +125,8 @@ static func validate_bank(data) -> Dictionary:
 			errors.append("%s: domain must be a number" % label)
 		elif not is_finite(float(dom)) or float(dom) < MIN_DOMAIN or float(dom) > MAX_DOMAIN:
 			errors.append("%s: domain is out of range (%d..%d)" % [label, MIN_DOMAIN, MAX_DOMAIN])
+		elif float(dom) != floorf(float(dom)):
+			errors.append("%s: domain must be an integer" % label)
 
 		var keys: Array = []
 		var opts = q.get("options")
@@ -135,6 +142,8 @@ static func validate_bank(data) -> Dictionary:
 				var key := String((opt as Dictionary).get("key", "")).strip_edges()
 				if key == "":
 					errors.append("%s: option with empty key" % label)
+				elif not ALLOWED_OPTION_KEYS.has(key):
+					errors.append("%s: option key '%s' must be one of %s" % [label, key, ", ".join(ALLOWED_OPTION_KEYS)])
 				elif keys.has(key):
 					errors.append("%s: duplicate option key '%s'" % [label, key])
 				var otext := String((opt as Dictionary).get("text", ""))
@@ -150,9 +159,14 @@ static func validate_bank(data) -> Dictionary:
 		if typeof(answers) != TYPE_ARRAY or (answers as Array).is_empty():
 			errors.append("%s: answers must be a non-empty array" % label)
 			answers = []
+		var seen_answers := {}
 		for a in answers:
-			if not keys.has(String(a)):
-				errors.append("%s: answer key '%s' not found in options" % [label, String(a)])
+			var answer_key := String(a).strip_edges()
+			if seen_answers.has(answer_key):
+				errors.append("%s: duplicate answer key '%s'" % [label, answer_key])
+			seen_answers[answer_key] = true
+			if not keys.has(answer_key):
+				errors.append("%s: answer key '%s' not found in options" % [label, answer_key])
 
 		var qtype := String(q.get("type", ""))
 		if not VALID_TYPES.has(qtype):
