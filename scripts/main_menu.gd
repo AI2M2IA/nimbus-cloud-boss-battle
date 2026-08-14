@@ -104,14 +104,14 @@ func _ready() -> void:
 
 func _apply_responsive_layout() -> void:
 	var width := get_viewport_rect().size.x
-	var display_scale := DisplayServer.screen_get_scale(DisplayServer.SCREEN_OF_MAIN_WINDOW)
+	var breakpoint_width := UILayout.logical_viewport_width(width)
 	var side_margin := 20 if width < 600.0 else (32 if width < 900.0 else 48)
 	_margin.add_theme_constant_override("margin_left", side_margin)
 	_margin.add_theme_constant_override("margin_right", side_margin)
 	_margin.add_theme_constant_override("margin_top", 24 if width < 600.0 else 32)
 	_margin.add_theme_constant_override("margin_bottom", 24 if width < 600.0 else 32)
-	_boss_grid.columns = UILayout.responsive_columns(width, 280.0, 3, side_margin * 2.0, 18.0, display_scale)
-	_modes_grid.columns = UILayout.responsive_columns(width, 280.0, 3, side_margin * 2.0, 18.0, display_scale)
+	_boss_grid.columns = UILayout.responsive_columns(width, 280.0, 3, side_margin * 2.0, 18.0, breakpoint_width)
+	_modes_grid.columns = UILayout.responsive_columns(width, 280.0, 3, side_margin * 2.0, 18.0, breakpoint_width)
 
 
 func _make_language_row() -> HFlowContainer:
