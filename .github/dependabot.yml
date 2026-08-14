@@ -6,7 +6,7 @@ updates:
       interval: weekly
       day: monday
       time: "09:00"
-      timezone: America/Sao_Paulo
+      timezone: Etc/UTC
     target-branch: develop
     open-pull-requests-limit: 5
     commit-message:
