@@ -3,6 +3,7 @@ extends Control
 ## All UI is built in code.
 
 const ModeRules := preload("res://scripts/mode_rules.gd")
+const BattleRules := preload("res://scripts/battle_rules.gd")
 const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
 const UITheme := preload("res://scripts/ui_theme.gd")
 const ReviewSchedulerScript := preload("res://scripts/review_scheduler.gd")
@@ -240,7 +241,7 @@ func _make_card(battle: Dictionary) -> PanelContainer:
 	var status := Game.t("menu.not_fought")
 	var status_color := UITheme.TEXT_DIM
 	if not in_progress.is_empty():
-		status = Game.t("menu.in_progress") % [int(in_progress["answered"]), int(in_progress["queue"].size())]
+		status = Game.t("menu.in_progress") % [BattleRules.next_round(int(in_progress["answered"])), int(in_progress["queue"].size())]
 		status_color = UITheme.ACCENT
 	elif not rec.is_empty():
 		if rec.get("defeated", false):
