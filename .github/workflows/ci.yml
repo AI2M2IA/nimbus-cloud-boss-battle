@@ -71,12 +71,16 @@ jobs:
           # valid signature. API errors and incomplete/untrusted responses fail
           # closed: no SHA is added and the identity checker rejects the bot.
           if [ "$EVENT_NAME" = "push" ]; then
-            while IFS= read -r sha; do
+            while IFS=$'\t' read -r sha author_name author_email; do
+              if [ "$author_name" != "dependabot[bot]" ] \
+                  || [ "$author_email" != "49699333+dependabot[bot]@users.noreply.github.com" ]; then
+                continue
+              fi
               if gh api "repos/${GITHUB_REPOSITORY}/commits/${sha}" \
                   | python3 scripts/dev/verify_dependabot_commit.py "$sha"; then
                 identity_args+=(--allow-dependabot-sha "$sha")
               fi
-            done < <(git rev-list "${BASE_SHA}..${HEAD_SHA}")
+            done < <(git log --format=$'%H\t%an\t%ae' "${BASE_SHA}..${HEAD_SHA}")
           fi
           bash scripts/dev/check_commit_identity.sh "${BASE_SHA}..${HEAD_SHA}" "${identity_args[@]}"
 
