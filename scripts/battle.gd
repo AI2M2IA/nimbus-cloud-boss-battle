@@ -47,6 +47,7 @@ var dialog_cancel: Callable = func() -> void: pass
 ## exactly once -- the quiz view keeps answered == true under the overlay,
 ## so Enter/Space would otherwise re-emit continue_requested forever.
 var _ended: bool = false
+var _margin: MarginContainer
 
 
 func _ready() -> void:
@@ -86,20 +87,16 @@ func _build_ui() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	var margin := MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 48)
-	margin.add_theme_constant_override("margin_right", 48)
-	margin.add_theme_constant_override("margin_top", 24)
-	margin.add_theme_constant_override("margin_bottom", 24)
-	add_child(margin)
+	_margin = MarginContainer.new()
+	_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_margin)
 
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 12)
-	margin.add_child(root)
+	_margin.add_child(root)
 
 	# --- header: boss on the left, player on the right
-	var header := HBoxContainer.new()
+	var header := HFlowContainer.new()
 	header.add_theme_constant_override("separation", 32)
 	root.add_child(header)
 
@@ -116,6 +113,7 @@ func _build_ui() -> void:
 	boss_hp_bar.custom_minimum_size = Vector2(0, 18)
 	boss_hp_bar.max_value = total_unique
 	boss_hp_bar.value = total_unique - correct_done
+	boss_hp_bar.accessibility_name = Game.t("battle.boss_hp") % [total_unique, total_unique]
 	boss_hp_bar.add_theme_stylebox_override("background", UITheme.panel_box(UITheme.PANEL_LIGHT, 6, 2))
 	boss_hp_bar.add_theme_stylebox_override("fill", UITheme.panel_box(boss_color, 6, 2))
 	boss_box.add_child(boss_hp_bar)
@@ -158,6 +156,20 @@ func _build_ui() -> void:
 	quit.add_theme_color_override("font_color", UITheme.TEXT_DIM)
 	quit.pressed.connect(_on_retreat_pressed)
 	root.add_child(quit)
+
+	get_viewport().size_changed.connect(_apply_responsive_layout)
+	_apply_responsive_layout()
+
+
+func _apply_responsive_layout() -> void:
+	if not is_instance_valid(_margin):
+		return
+	var width := get_viewport_rect().size.x
+	var side_margin := 16 if width < 600.0 else (32 if width < 900.0 else 48)
+	_margin.add_theme_constant_override("margin_left", side_margin)
+	_margin.add_theme_constant_override("margin_right", side_margin)
+	_margin.add_theme_constant_override("margin_top", 16 if width < 600.0 else 24)
+	_margin.add_theme_constant_override("margin_bottom", 16 if width < 600.0 else 24)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -237,6 +249,9 @@ func _on_continue_pressed() -> void:
 
 
 func _animate_boss_hit(damage_xp: int) -> void:
+	if Game.reduced_motion:
+		boss_hp_bar.value = float(total_unique - correct_done)
+		return
 	var tw := create_tween()
 	tw.tween_property(boss_hp_bar, "value", float(total_unique - correct_done), 0.35)
 
@@ -257,6 +272,7 @@ func _animate_boss_hit(damage_xp: int) -> void:
 func _update_hud() -> void:
 	var remaining := total_unique - correct_done
 	boss_hp_label.text = Game.t("battle.boss_hp") % [remaining, total_unique]
+	boss_hp_bar.accessibility_name = boss_hp_label.text
 	# `current_q` is already present in queue immediately after a wrong answer,
 	# so counting both briefly inflated the remaining-question indicator.
 	progress_label.text = Game.t("battle.progress") % [questions_seen, remaining]
@@ -306,14 +322,19 @@ func _write_checkpoint() -> void:
 	if _ended:
 		return
 	var ids: Array = []
+	var answered := questions_seen
 	if not current_q.is_empty() and not question_view.answered:
 		ids.append(String(current_q.get("id", "")))
+		# This question has only been displayed, not answered. It returns at
+		# the front of the queue, so the restored _next_question() must advance
+		# back to this same round instead of skipping one.
+		answered = maxi(questions_seen - 1, 0)
 	for q in queue:
 		ids.append(String(q.get("id", "")))
 	if ids.is_empty():
 		return
 	Game.save_battle_checkpoint(String(battle["id"]), Rules.make_checkpoint(
-		ids, hearts, correct_done, questions_seen, streak, best_streak, xp_earned,
+		ids, hearts, correct_done, answered, streak, best_streak, xp_earned,
 		total_unique, attempted.keys(), first_try_correct, battle_pool_ids))
 
 
@@ -331,7 +352,7 @@ func _build_pool_error() -> void:
 
 	var panel := PanelContainer.new()
 	panel.add_theme_stylebox_override("panel", UITheme.panel_box(UITheme.PANEL, 16, 28))
-	panel.custom_minimum_size = Vector2(520, 0)
+	panel.custom_minimum_size = Vector2(minf(520.0, maxf(get_viewport_rect().size.x - 32.0, 240.0)), 0)
 	center.add_child(panel)
 
 	var box := VBoxContainer.new()
@@ -363,7 +384,7 @@ func _on_retreat_pressed() -> void:
 func _show_resume_dialog(checkpoint: Dictionary) -> void:
 	_show_dialog(
 		Game.t("battle.resume_title"),
-		Game.t("battle.resume_prompt") % [int(checkpoint["answered"]), int(checkpoint["total"]), int(checkpoint["hearts"])],
+		Game.t("battle.resume_prompt") % [Rules.next_round(int(checkpoint["answered"])), int(checkpoint["queue"].size()), int(checkpoint["hearts"])],
 		[
 			{"text": Game.t("battle.resume"), "color": boss_color.darkened(0.4), "on_pressed": func() -> void:
 				_close_dialog()
@@ -428,13 +449,19 @@ func _end_battle(victory: bool) -> void:
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.add_child(dim)
 
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	overlay.add_child(scroll)
+
 	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.add_child(center)
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.add_child(center)
 
 	var panel := PanelContainer.new()
 	panel.add_theme_stylebox_override("panel", UITheme.panel_box(UITheme.PANEL, 16, 28))
-	panel.custom_minimum_size = Vector2(520, 0)
+	panel.custom_minimum_size = Vector2(minf(520.0, maxf(get_viewport_rect().size.x - 32.0, 240.0)), 0)
 	center.add_child(panel)
 
 	var box := VBoxContainer.new()
@@ -464,8 +491,8 @@ func _end_battle(victory: bool) -> void:
 
 	box.add_child(ScoreRowScript.build("boss", xp_earned))
 
-	var buttons := HBoxContainer.new()
-	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	var buttons := HFlowContainer.new()
+	buttons.alignment = FlowContainer.ALIGNMENT_CENTER
 	buttons.add_theme_constant_override("separation", 12)
 	box.add_child(buttons)
 

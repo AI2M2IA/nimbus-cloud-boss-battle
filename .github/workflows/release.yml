@@ -35,10 +35,10 @@ jobs:
       GODOT_TEMPLATES_SHA256: "3fbe2c0e2dec9d537ab9ec97bcf8da91dcf23357fc51f67092dd068d839290a8"
       # Pinned rcodesign (apple-codesign) release + its verified sha256 — see
       # the signing step below for why this isn't resolved dynamically.
-      RCODESIGN_VERSION: "0.29.0"
-      RCODESIGN_SHA256: "dbe85cedd8ee4217b64e9a0e4c2aef92ab8bcaaa41f20bde99781ff02e600002"
+      APPLE_CODESIGN_VERSION: "0.29.0"
+      APPLE_CODESIGN_ARCHIVE_SHA256: "dbe85cedd8ee4217b64e9a0e4c2aef92ab8bcaaa41f20bde99781ff02e600002"
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install Godot ${{ env.GODOT_VERSION }} + export templates
         run: |
@@ -160,6 +160,7 @@ jobs:
           # fonts) must fail the build, not silently ship tofu.
           ./godot --headless --path . --import
           ./godot --headless --path . --export-release "Web" "build/web/index.html"
+          python3 scripts/dev/harden_web_export.py build/web/index.html
           ./godot --headless --path . --export-release "Linux" "build/linux/${GAME}.x86_64"
           ./godot --headless --path . --export-release "Windows" "build/windows/${GAME}.exe"
           ./godot --headless --path . --export-release "macOS" "build/macos/${GAME}.zip"
@@ -180,12 +181,16 @@ jobs:
           # to the release artifacts. Bump the version/checksum deliberately —
           # download the new asset, inspect it, compute its sha256 — when a
           # newer rcodesign is actually needed.
-          asset="apple-codesign-${RCODESIGN_VERSION}-x86_64-unknown-linux-musl.tar.gz"
-          url="https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F${RCODESIGN_VERSION}/${asset}"
+          asset="apple-codesign-${APPLE_CODESIGN_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          url="https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F${APPLE_CODESIGN_VERSION}/${asset}"
           curl -fsSL -o rcodesign.tar.gz "$url"
-          echo "${RCODESIGN_SHA256}  rcodesign.tar.gz" | sha256sum -c -
-          tar -xzf rcodesign.tar.gz
-          rc="$(find . -type f -name rcodesign | head -1)"
+          # Avoid RCODESIGN_* environment names entirely: rcodesign interprets
+          # that prefix as command configuration, including otherwise harmless
+          # version and checksum variables.
+          echo "${APPLE_CODESIGN_ARCHIVE_SHA256}  rcodesign.tar.gz" | sha256sum -c -
+          mkdir -p _tools/rcodesign
+          tar -xzf rcodesign.tar.gz -C _tools/rcodesign
+          rc="$(find _tools/rcodesign -type f -name rcodesign -print -quit)"
           test -n "$rc" || { echo "rcodesign binary not found"; exit 1; }
           chmod +x "$rc"
           # Godot exports the .app inside build/macos/<GAME>.zip — unzip, sign, rezip.
@@ -211,7 +216,7 @@ jobs:
           ls -la dist
 
       - name: Upload release artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-artifacts
           path: dist/*
@@ -226,7 +231,7 @@ jobs:
       contents: write
     steps:
       - name: Download release artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release-artifacts
           path: dist

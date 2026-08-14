@@ -21,6 +21,8 @@ const FALLBACK_NAME := "???"
 ## Per-mode cap so leaderboard.json can't grow without bound (record_score
 ## only ever appends; the display slices top-N anyway).
 const MAX_ENTRIES_PER_MODE := 100
+const MAX_SCORE := 2147483647
+const INVALID_DATE := "9999-12-31T23:59:59"
 
 
 ## Trim, strip line breaks and control/bidi/zero-width characters, and cap a
@@ -37,7 +39,29 @@ static func sanitize_name(name: String) -> String:
 
 
 static func make_entry(name: String, mode: String, score: int, date: String) -> Dictionary:
-	return {"name": sanitize_name(name), "mode": mode, "score": score, "date": date}
+	return {
+		"name": sanitize_name(name),
+		"mode": mode if MODES.has(mode) else "boss",
+		"score": sanitize_score(score),
+		"date": sanitize_date(date),
+	}
+
+
+static func sanitize_score(value) -> int:
+	if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
+		return 0
+	var number := float(value)
+	if not is_finite(number) or number < 0.0 or number != floorf(number):
+		return 0
+	return mini(int(number), MAX_SCORE)
+
+
+static func sanitize_date(value: String) -> String:
+	if value.length() != 19 or QuizImport.has_unsafe_chars(value):
+		return INVALID_DATE
+	var iso := RegEx.create_from_string(
+		"^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$")
+	return value if iso.search(value) != null else INVALID_DATE
 
 
 ## True when a ranks strictly better than b: higher score first,
@@ -104,12 +128,10 @@ static func sanitize_entries(entries: Array) -> Array:
 		var mode := String(entry.get("mode", ""))
 		if not MODES.has(mode):
 			continue
-		var raw_score = entry.get("score", 0)
-		var score := int(raw_score) if (typeof(raw_score) == TYPE_INT or typeof(raw_score) == TYPE_FLOAT) else 0
 		out.append({
 			"name": sanitize_name(String(entry.get("name", ""))),
 			"mode": mode,
-			"score": score,
-			"date": String(entry.get("date", "")),
+			"score": sanitize_score(entry.get("score", 0)),
+			"date": sanitize_date(String(entry.get("date", ""))),
 		})
 	return out
