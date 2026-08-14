@@ -10,6 +10,7 @@ const QuizImport := preload("res://scripts/quiz_import.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd")
 const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
 const ReviewSchedulerScript := preload("res://scripts/review_scheduler.gd")
+const UILayout := preload("res://scripts/ui_layout.gd")
 # Deliberately NOT preloading scripts/ui/quiz_question_view.gd as a top-level
 # const here: battle.gd/mode_battle.gd already preload it themselves, and a
 # *second* top-level preload of the same script from this file (the -s main
@@ -63,6 +64,7 @@ func _initialize() -> void:
 	_test_mode_sessions()
 	_test_review_scheduler()
 	_test_text_scale()
+	_test_responsive_layout()
 	_test_branding()
 	_test_scene_smoke()
 	await _test_overflow_hint()
@@ -274,7 +276,7 @@ func _test_modes() -> void:
 	check(ModeRules.pet_outcome(5, 0, 5) == "saved", "scaled goal is winnable on a small pool")
 	check(ModeRules.pet_outcome(4, 0, 5) == "ongoing", "scaled goal not yet met")
 	check(ModeRules.pet_outcome(4, 3, 5) == "lost", "loss still takes precedence with a scaled goal")
-	check(ModeRules.DECAY_QUESTION_CAP == 100, "decay has a 100-question cap")
+	check(ModeRules.DECAY_QUESTION_CAP == 50, "decay has a 50-question cap")
 	check(ModeRules.PETS.size() == 5, "5 pets available")
 	check(ModeRules.is_valid_pet("cat") and ModeRules.is_valid_pet("fish"), "cat and fish are valid pets")
 	check(not ModeRules.is_valid_pet("dragon"), "dragon is not a pet")
@@ -314,6 +316,8 @@ func _test_pet_avatar() -> void:
 	check(is_equal_approx(avatar.progress_ratio(), 0.35), "pet progress ratio")
 	avatar.set_progress(99, 20, 9, 3)
 	check(is_equal_approx(avatar.progress_ratio(), 1.0), "pet progress caps at 1.0")
+	avatar.set_reduced_motion(true)
+	check(avatar.reduced_motion, "pet animation honors reduced motion")
 	avatar.free()
 
 
@@ -463,6 +467,7 @@ func _test_game_state() -> void:
 				check(domains_seen.has(d), "Gatekeeper pool includes domain %d (actually cross-domain now)" % d)
 		else:
 			var dom := int(b["domain"])
+			check(pool.size() == gs.DOMAIN_BATTLE_SAMPLE_SIZE, "battle '%s' samples %d questions" % [id, gs.DOMAIN_BATTLE_SAMPLE_SIZE])
 			var only_dom := true
 			for q in pool:
 				if int(q.get("domain", -99)) != dom:
@@ -486,19 +491,19 @@ func _test_game_state() -> void:
 	gs.save_data = {"xp": 0, "battles": {}}
 	gs._fallback = gs._load_lang_file("en")
 	check(gs.player_rank() == "Cloud Novice", "rank at 0 XP")
-	gs.save_data["xp"] = 9999
+	gs.save_data["xp"] = 4999
 	check(gs.player_rank() == "Cloud Novice", "rank just under the first threshold")
-	gs.save_data["xp"] = 10000
+	gs.save_data["xp"] = 5000
 	check(gs.player_rank() == "Region Rookie", "rank at the first threshold")
-	gs.save_data["xp"] = 45000
-	check(gs.player_rank() == "Availability Zone Adventurer", "rank at 45000 XP")
+	gs.save_data["xp"] = 16000
+	check(gs.player_rank() == "Availability Zone Adventurer", "rank at 16000 XP")
 	gs.save_data["xp"] = 999999
 	check(gs.player_rank() == "Solutions Architect Hero", "top rank")
 	var next: Dictionary = gs.next_rank_info()
 	check(next.is_empty(), "no next rank at the top")
 	gs.save_data["xp"] = 0
 	next = gs.next_rank_info()
-	check(int(next.get("remaining", -1)) == 10000, "next rank is 10000 XP away at zero")
+	check(int(next.get("remaining", -1)) == 5000, "next rank is 5000 XP away at zero")
 	check(String(next.get("key", "")) == "rank.rookie", "next rank key is the rookie rank")
 
 	# record_result mutates and persists; snapshot the real save and restore it.
@@ -535,6 +540,7 @@ func _test_save_hardening() -> void:
 		},
 		"modes": {"survival": {"best_score": -10, "attempts": 2.5}, "unknown": {"best_score": 999}},
 		"text_scale": 99.0,
+		"reduced_motion": true,
 		"lang": "../../etc/passwd",
 		"unknown_key": 1,
 		"player_name": "  ok name" + char(0x202E) + "  ",
@@ -543,6 +549,7 @@ func _test_save_hardening() -> void:
 	check(int(clean.get("xp", -1)) == 0, "non-numeric XP resets to 0")
 	check(typeof(clean.get("battles")) == TYPE_DICTIONARY, "battle records normalize to a dictionary")
 	check(is_equal_approx(float(clean.get("text_scale", -1.0)), gs.TEXT_SCALE_MAX), "text_scale clamps to max")
+	check(bool(clean.get("reduced_motion", false)), "reduced_motion keeps a valid boolean")
 	check(not clean.has("lang"), "unknown saved language is dropped")
 	check(String(clean.get("player_name", "")) == "ok name", "saved player name is sanitized")
 	check(clean["battles"].has("d1") and not clean["battles"].has("unknown"), "only known battle ids survive")
@@ -751,6 +758,11 @@ func _test_leaderboard() -> void:
 	var mixed := [a, b, Leaderboard.make_entry("D", "decay", 99, "2026-01-01T00:00:00")]
 	check(Leaderboard.top_for_mode(mixed, "survival", 10).size() == 2, "top_for_mode filters by mode")
 	check(Leaderboard.top_for_mode(mixed, "survival", 1).size() == 1, "top_for_mode caps at N")
+	check(Leaderboard.sanitize_score(-1) == 0, "negative scores are rejected")
+	check(Leaderboard.sanitize_score(12.5) == 0, "fractional scores are rejected")
+	check(Leaderboard.sanitize_score(999999999999) == Leaderboard.MAX_SCORE, "huge scores are clamped")
+	check(Leaderboard.sanitize_date("not-a-date") == Leaderboard.INVALID_DATE, "malformed dates sort last")
+	check(Leaderboard.sanitize_date("2026-01-02T03:04:05") == "2026-01-02T03:04:05", "canonical dates survive")
 
 	# Per-mode bound: inserting past MAX_ENTRIES_PER_MODE trims the worst
 	# entries of that mode only, so leaderboard.json can't grow unbounded.
@@ -884,6 +896,14 @@ func _test_text_scale() -> void:
 	check(GameState.stepped_scale(1.0, -0.15) < 1.0, "minus decreases scale")
 	check(GameState.stepped_scale(GameState.TEXT_SCALE_MAX, 0.15) == GameState.TEXT_SCALE_MAX, "clamps at max")
 	check(GameState.stepped_scale(GameState.TEXT_SCALE_MIN, -0.15) == GameState.TEXT_SCALE_MIN, "clamps at min")
+	check(GameState.TEXT_SCALE_MAX == 2.0, "text can scale to 200 percent")
+
+
+func _test_responsive_layout() -> void:
+	print("[responsive_layout]")
+	check(UILayout.responsive_columns(390.0, 280.0, 3, 40.0) == 1, "phone portrait uses one card column")
+	check(UILayout.responsive_columns(768.0, 280.0, 3, 64.0) == 2, "tablet portrait uses two card columns")
+	check(UILayout.responsive_columns(1280.0, 280.0, 3, 96.0) == 3, "desktop uses three card columns")
 
 # ------------------------------------------------------------------- branding
 
@@ -1116,6 +1136,21 @@ func _test_select_two_keyboard() -> void:
 	_press_key(view, KEY_5)
 	await process_frame
 	check(_last_signal_payload == ["E"], "single: 5 selects the fifth displayed option")
+
+	var why_question := {
+		"id": "test-why-not",
+		"type": "single",
+		"stem": "Synthetic distractor feedback question.",
+		"options": [
+			{"key": "A", "text": "Correct"},
+			{"key": "B", "text": "Distractor"},
+		],
+		"answers": ["A"],
+		"whyNots": {"B": "This distractor misses the resilience requirement."},
+	}
+	view.show_question(why_question)
+	view.show_result(["B"], ["A"], "Miss", Color.RED, "Base explanation.")
+	check(view.explain_text.text.contains("resilience requirement"), "chosen distractor whyNot is shown")
 
 	instance.queue_free()
 	_restore_file(GameState.SAVE_PATH, snap_save)

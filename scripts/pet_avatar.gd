@@ -19,6 +19,7 @@ const TEAR := Color("#7fd7ff")
 const SPARK := Color("#ffe77a")
 
 var pet_id: String = "cat"
+var reduced_motion: bool = false
 
 var _mood: String = MOOD_IDLE
 var _time := 0.0
@@ -41,13 +42,24 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	_time += delta
+	if not reduced_motion:
+		_time += delta
 	pivot_offset = size * 0.5
 	queue_redraw()
 
 
 func set_pet(id: String) -> void:
 	pet_id = id if PET_IDS.has(id) else "cat"
+	queue_redraw()
+
+
+func set_reduced_motion(enabled: bool) -> void:
+	reduced_motion = enabled
+	if enabled:
+		_time = 0.0
+		_shake_offset = 0.0
+		scale = Vector2.ONE
+		_reset_tween()
 	queue_redraw()
 
 
@@ -107,7 +119,7 @@ func _return_to_idle_after(token: int, seconds: float) -> void:
 
 
 func _play_happy_tween() -> void:
-	if not is_inside_tree():
+	if reduced_motion or not is_inside_tree():
 		return
 	_reset_tween()
 	scale = Vector2.ONE
@@ -118,7 +130,7 @@ func _play_happy_tween() -> void:
 
 
 func _play_wrong_tween() -> void:
-	if not is_inside_tree():
+	if reduced_motion or not is_inside_tree():
 		return
 	_reset_tween()
 	scale = Vector2.ONE
@@ -139,7 +151,7 @@ func _reset_tween() -> void:
 
 func _draw() -> void:
 	var s: float = min(size.x / 210.0, size.y / 166.0)
-	var bob := sin(_time * 3.0) * 2.6
+	var bob := 0.0 if reduced_motion else sin(_time * 3.0) * 2.6
 	var center := Vector2(size.x * 0.5 + _shake_offset, size.y * 0.48 + bob)
 
 	draw_set_transform(center, 0.0, Vector2(s, s))

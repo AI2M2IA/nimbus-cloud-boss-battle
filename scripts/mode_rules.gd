@@ -17,10 +17,9 @@ const DECAY_WRONG_PENALTY := 100
 const DECAY_CORRECT_REWARD := 50
 ## Hard stop so a Decay run can't drag on for the whole 662-question pool
 ## (~5+ hours) and so scores stay comparable across bank updates: past the
-## cap the run ends in a win with whatever points are left. 100 correct
-## answers cap the theoretical score at 6000, close to the pre-662-bank
-## maximum (~6400), keeping old leaderboard entries meaningful.
-const DECAY_QUESTION_CAP := 100
+## cap the run ends in a win with whatever points are left. Fifty questions
+## keep a focused run under roughly one hour while retaining score pressure.
+const DECAY_QUESTION_CAP := 50
 
 const PET_MAX_WRONG := 3
 const PET_GOAL_CORRECT := 20

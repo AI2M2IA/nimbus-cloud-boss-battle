@@ -60,6 +60,7 @@ func configure(accent_color: Color) -> void:
 	scroll.add_child(card_box)
 
 	badge_label = UITheme.label("", 13, accent_color)
+	badge_label.accessibility_name = Game.t("battle.pick_one")
 	card_box.add_child(badge_label)
 
 	stem_text = RichTextLabel.new()
@@ -68,6 +69,7 @@ func configure(accent_color: Color) -> void:
 	stem_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	stem_text.add_theme_font_size_override("normal_font_size", UITheme.fs(18))
 	stem_text.add_theme_color_override("default_color", UITheme.TEXT)
+	stem_text.accessibility_name = Game.t("custom.stem")
 	card_box.add_child(stem_text)
 
 	# Long, multi-part scenario questions can overflow the card on the
@@ -110,6 +112,7 @@ func configure(accent_color: Color) -> void:
 	explain_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	explain_text.add_theme_font_size_override("normal_font_size", UITheme.fs(15))
 	explain_text.add_theme_color_override("default_color", UITheme.TEXT)
+	explain_text.accessibility_name = Game.t("custom.explanation")
 	ex_box.add_child(explain_text)
 
 	continue_btn = Button.new()
@@ -135,6 +138,7 @@ func show_question(question: Dictionary, badge_suffix: String = "") -> void:
 	if badge_suffix != "":
 		badge += "   |   " + badge_suffix
 	badge_label.text = badge
+	badge_label.accessibility_name = badge
 
 	stem_text.text = String(question.get("stem", ""))
 
@@ -228,8 +232,16 @@ func show_result(chosen: Array, answers: Array, verdict_text: String, verdict_co
 	confirm_btn.visible = false
 
 	verdict_label.text = verdict_text
+	verdict_label.accessibility_name = verdict_text
 	verdict_label.add_theme_color_override("font_color", verdict_color)
-	explain_text.text = explanation
+	var full_explanation := explanation
+	var why_nots = current_q.get("whyNots", {})
+	if typeof(why_nots) == TYPE_DICTIONARY:
+		for key in chosen:
+			if not answers.has(key) and why_nots.has(key):
+				full_explanation += "\n\n" + Game.t("battle.why_not") % [String(key), String(why_nots[key])]
+	explain_text.text = full_explanation
+	explain_text.accessibility_description = full_explanation
 	explain_panel.visible = true
 	_scroll_to_explanation()
 

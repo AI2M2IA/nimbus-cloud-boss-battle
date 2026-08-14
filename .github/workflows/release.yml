@@ -160,6 +160,7 @@ jobs:
           # fonts) must fail the build, not silently ship tofu.
           ./godot --headless --path . --import
           ./godot --headless --path . --export-release "Web" "build/web/index.html"
+          python3 scripts/dev/harden_web_export.py build/web/index.html
           ./godot --headless --path . --export-release "Linux" "build/linux/${GAME}.x86_64"
           ./godot --headless --path . --export-release "Windows" "build/windows/${GAME}.exe"
           ./godot --headless --path . --export-release "macOS" "build/macos/${GAME}.zip"
@@ -184,8 +185,9 @@ jobs:
           url="https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F${RCODESIGN_VERSION}/${asset}"
           curl -fsSL -o rcodesign.tar.gz "$url"
           echo "${RCODESIGN_SHA256}  rcodesign.tar.gz" | sha256sum -c -
-          tar -xzf rcodesign.tar.gz
-          rc="$(find . -type f -name rcodesign | head -1)"
+          mkdir -p _tools/rcodesign
+          tar -xzf rcodesign.tar.gz -C _tools/rcodesign
+          rc="$(find _tools/rcodesign -type f -name rcodesign -print -quit)"
           test -n "$rc" || { echo "rcodesign binary not found"; exit 1; }
           chmod +x "$rc"
           # Godot exports the .app inside build/macos/<GAME>.zip — unzip, sign, rezip.

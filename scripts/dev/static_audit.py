@@ -126,6 +126,7 @@ BINARY_SUFFIXES = (
     ".zip",
 )
 MAX_TEXT_BYTES = 2 * 1024 * 1024
+FULL_COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 BRITISH_TO_AMERICAN = {
     "analyse": "analyze",
@@ -428,6 +429,7 @@ def audit(root: Path) -> tuple[list[Finding], int]:
     paths = release_surface_paths(root)
 
     check_license(root, findings)
+    check_workflow_action_pins(root, findings)
 
     for rel_path in paths:
         reason = forbidden_path_reason(rel_path)
@@ -447,6 +449,30 @@ def audit(root: Path) -> tuple[list[Finding], int]:
         scan_text(rel_path, text, findings)
 
     return sorted(findings, key=Finding.sort_key), len(paths)
+
+
+def check_workflow_action_pins(root: Path, findings: list[Finding]) -> None:
+    """Require every third-party workflow action to use a full commit SHA."""
+    workflows = root / ".github" / "workflows"
+    if not workflows.is_dir():
+        return
+    for path in sorted([*workflows.glob("*.yml"), *workflows.glob("*.yaml")]):
+        rel = rel_text(path.relative_to(root))
+        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            match = re.match(r"^\s*-?\s*uses:\s*([^\s#]+)", line)
+            if match is None:
+                continue
+            target = match.group(1)
+            if target.startswith("./"):
+                continue
+            if "@" not in target:
+                findings.append(Finding(rel, line_number, "workflow action has no pinned revision"))
+                continue
+            revision = target.rsplit("@", 1)[1]
+            if FULL_COMMIT_SHA_RE.fullmatch(revision) is None:
+                findings.append(
+                    Finding(rel, line_number, "workflow action is not pinned to a full commit SHA")
+                )
 
 
 def print_results(findings: list[Finding], scanned_count: int) -> None:

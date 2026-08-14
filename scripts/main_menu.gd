@@ -6,6 +6,11 @@ const ModeRules := preload("res://scripts/mode_rules.gd")
 const PetAvatarScript := preload("res://scripts/pet_avatar.gd")
 const UITheme := preload("res://scripts/ui_theme.gd")
 const ReviewSchedulerScript := preload("res://scripts/review_scheduler.gd")
+const UILayout := preload("res://scripts/ui_layout.gd")
+
+var _margin: MarginContainer
+var _boss_grid: GridContainer
+var _modes_grid: GridContainer
 
 
 func _ready() -> void:
@@ -19,19 +24,15 @@ func _ready() -> void:
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scroll)
 
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 48)
-	margin.add_theme_constant_override("margin_right", 48)
-	margin.add_theme_constant_override("margin_top", 32)
-	margin.add_theme_constant_override("margin_bottom", 32)
-	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.add_child(margin)
+	_margin = MarginContainer.new()
+	_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_margin)
 
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 18)
 	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	margin.add_child(root)
+	_margin.add_child(root)
 
 	var title := UITheme.label(Game.t("menu.title"), 42, UITheme.ACCENT)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -58,15 +59,14 @@ func _ready() -> void:
 	root.add_child(_make_language_row())
 	root.add_child(_make_extras_row())
 
-	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 18)
-	grid.add_theme_constant_override("v_separation", 18)
-	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	root.add_child(grid)
+	_boss_grid = GridContainer.new()
+	_boss_grid.add_theme_constant_override("h_separation", 18)
+	_boss_grid.add_theme_constant_override("v_separation", 18)
+	_boss_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_child(_boss_grid)
 
 	for battle in Game.BATTLES:
-		grid.add_child(_make_card(battle))
+		_boss_grid.add_child(_make_card(battle))
 
 	var hint := UITheme.label(Game.t("menu.hint"), 14, UITheme.TEXT_DIM)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -89,24 +89,39 @@ func _ready() -> void:
 	pool_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(pool_label)
 
-	var modes_grid := GridContainer.new()
-	modes_grid.columns = 3
-	modes_grid.add_theme_constant_override("h_separation", 18)
-	modes_grid.add_theme_constant_override("v_separation", 18)
-	modes_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	root.add_child(modes_grid)
+	_modes_grid = GridContainer.new()
+	_modes_grid.add_theme_constant_override("h_separation", 18)
+	_modes_grid.add_theme_constant_override("v_separation", 18)
+	_modes_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_child(_modes_grid)
 
 	for mode in Game.MODES:
-		modes_grid.add_child(_make_mode_card(mode))
+		_modes_grid.add_child(_make_mode_card(mode))
+
+	get_viewport().size_changed.connect(_apply_responsive_layout)
+	_apply_responsive_layout()
 
 
-func _make_language_row() -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
+func _apply_responsive_layout() -> void:
+	var width := get_viewport_rect().size.x
+	var side_margin := 20 if width < 600.0 else (32 if width < 900.0 else 48)
+	_margin.add_theme_constant_override("margin_left", side_margin)
+	_margin.add_theme_constant_override("margin_right", side_margin)
+	_margin.add_theme_constant_override("margin_top", 24 if width < 600.0 else 32)
+	_margin.add_theme_constant_override("margin_bottom", 24 if width < 600.0 else 32)
+	_boss_grid.columns = UILayout.responsive_columns(width, 280.0, 3, side_margin * 2.0)
+	_modes_grid.columns = UILayout.responsive_columns(width, 280.0, 3, side_margin * 2.0)
+
+
+func _make_language_row() -> HFlowContainer:
+	var row := HFlowContainer.new()
+	row.alignment = FlowContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 8)
 	row.add_child(UITheme.label(Game.t("menu.language"), 14, UITheme.TEXT_DIM))
 
 	var picker := OptionButton.new()
+	picker.accessibility_name = Game.t("menu.language")
+	picker.custom_minimum_size = Vector2(150, 44)
 	var langs: Array = Game.available_languages()
 	for i in range(langs.size()):
 		picker.add_item(String(langs[i]["name"]), i)
@@ -121,6 +136,7 @@ func _make_language_row() -> HBoxContainer:
 	var minus := Button.new()
 	minus.text = "A\u2212"
 	minus.tooltip_text = Game.t("menu.text_smaller")
+	minus.accessibility_name = Game.t("menu.text_smaller")
 	minus.add_theme_font_size_override("font_size", UITheme.fs(15))
 	UITheme.style_button(minus, UITheme.PANEL_LIGHT)
 	var on_smaller := func() -> void:
@@ -132,6 +148,7 @@ func _make_language_row() -> HBoxContainer:
 	var reset := Button.new()
 	reset.text = "A"
 	reset.tooltip_text = Game.t("menu.text_default")
+	reset.accessibility_name = Game.t("menu.text_default")
 	reset.add_theme_font_size_override("font_size", UITheme.fs(16))
 	UITheme.style_button(reset, UITheme.PANEL_LIGHT)
 	var on_reset := func() -> void:
@@ -143,6 +160,7 @@ func _make_language_row() -> HBoxContainer:
 	var plus := Button.new()
 	plus.text = "A+"
 	plus.tooltip_text = Game.t("menu.text_larger")
+	plus.accessibility_name = Game.t("menu.text_larger")
 	plus.add_theme_font_size_override("font_size", UITheme.fs(18))
 	UITheme.style_button(plus, UITheme.PANEL_LIGHT)
 	var on_larger := func() -> void:
@@ -150,13 +168,20 @@ func _make_language_row() -> HBoxContainer:
 		get_tree().reload_current_scene()
 	plus.pressed.connect(on_larger)
 	row.add_child(plus)
+
+	var motion := CheckButton.new()
+	motion.text = Game.t("menu.reduce_motion")
+	motion.accessibility_name = Game.t("menu.reduce_motion")
+	motion.button_pressed = Game.reduced_motion
+	motion.toggled.connect(Game.set_reduced_motion)
+	row.add_child(motion)
 	return row
 
 
 ## Custom Quiz and Leaderboard entries, between the language picker and bosses.
-func _make_extras_row() -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
+func _make_extras_row() -> HFlowContainer:
+	var row := HFlowContainer.new()
+	row.alignment = FlowContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 12)
 
 	var custom_btn := Button.new()
@@ -192,7 +217,7 @@ func _make_card(battle: Dictionary) -> PanelContainer:
 	var card := PanelContainer.new()
 	card.add_theme_stylebox_override("panel", UITheme.panel_box(UITheme.PANEL, 14, 18))
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	card.custom_minimum_size = Vector2(340, 200)
+	card.custom_minimum_size = Vector2(280, 200)
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
@@ -214,7 +239,7 @@ func _make_card(battle: Dictionary) -> PanelContainer:
 	var status := Game.t("menu.not_fought")
 	var status_color := UITheme.TEXT_DIM
 	if not in_progress.is_empty():
-		status = Game.t("menu.in_progress") % [int(in_progress["answered"]), int(in_progress["total"])]
+		status = Game.t("menu.in_progress") % [int(in_progress["answered"]), int(in_progress["queue"].size())]
 		status_color = UITheme.ACCENT
 	elif not rec.is_empty():
 		if rec.get("defeated", false):
@@ -245,7 +270,7 @@ func _make_mode_card(mode: Dictionary) -> PanelContainer:
 	var card := PanelContainer.new()
 	card.add_theme_stylebox_override("panel", UITheme.panel_box(UITheme.PANEL, 14, 18))
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	card.custom_minimum_size = Vector2(340, 290 if id == "pet" else 190)
+	card.custom_minimum_size = Vector2(280, 290 if id == "pet" else 190)
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
@@ -273,7 +298,7 @@ func _make_mode_card(mode: Dictionary) -> PanelContainer:
 
 	if id == "pet":
 		box.add_child(UITheme.label(Game.t("mode.pet.pick"), 13, UITheme.TEXT_DIM))
-		var pets := HBoxContainer.new()
+		var pets := HFlowContainer.new()
 		pets.add_theme_constant_override("separation", 8)
 		for p in ModeRules.PETS:
 			var choice := VBoxContainer.new()
@@ -281,6 +306,7 @@ func _make_mode_card(mode: Dictionary) -> PanelContainer:
 			choice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 			var avatar = PetAvatarScript.new()
+			avatar.set_reduced_motion(Game.reduced_motion)
 			avatar.custom_minimum_size = Vector2(72, 64)
 			avatar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			avatar.set_pet(String(p))
