@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 ## Regression tests for check_commit_identity.sh. The official automation
-## identity remains rejected by default and is accepted only with the explicit
-## PR flag or an allowlisted exact SHA; a lookalike using a different no-reply
-## address remains rejected.
+## identity remains rejected by default and is accepted only for an allowlisted
+## exact SHA; broad authorization flags and lookalikes remain rejected.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -50,13 +49,12 @@ bot_email='49699333+dependabot[bot]@users.noreply.github.com'
 base_sha="$(commit_as "$project_name" "$project_email" "$project_name" "$project_email")"
 bot_sha="$(commit_as "$bot_name" "$bot_email" "$bot_name" "$bot_email")"
 expect_fail check_fixture "$base_sha..$bot_sha"
-expect_pass check_fixture "$base_sha..$bot_sha" --allow-dependabot
+expect_fail check_fixture "$base_sha..$bot_sha" --allow-dependabot
 expect_pass check_fixture "$base_sha..$bot_sha" --allow-dependabot-sha "$bot_sha"
 expect_fail check_fixture "$base_sha..$bot_sha" --allow-dependabot-sha "$base_sha"
 expect_fail check_fixture "$base_sha..$bot_sha" --allow-dependabot-sha not-a-sha
 
 lookalike_sha="$(commit_as "$bot_name" "$project_email" "$bot_name" "$project_email")"
-expect_fail check_fixture "$bot_sha..$lookalike_sha" --allow-dependabot
 expect_fail check_fixture "$bot_sha..$lookalike_sha" --allow-dependabot-sha "$lookalike_sha"
 
 second_bot_sha="$(commit_as "$bot_name" "$bot_email" "$bot_name" "$bot_email")"
