@@ -69,6 +69,7 @@ func _initialize() -> void:
 	_test_scene_smoke()
 	await _test_overflow_hint()
 	await _test_select_two_keyboard()
+	await _test_checkpoint_resume_round()
 	await _test_retreat_confirmation()
 	print("--------------------------------------------------")
 	print("%d checks, %d failure(s)" % [checks, failures])
@@ -138,6 +139,8 @@ func _test_rules() -> void:
 	check(Rules.requeue_position(4) == 4, "requeue at the offset boundary returns queue size")
 	check(Rules.requeue_position(2) == 2, "requeue clamps to queue size for a short queue")
 	check(Rules.requeue_position(0) == 0, "requeue into empty queue")
+	check(Rules.next_round(0) == 1, "a fresh checkpoint resumes at round 1")
+	check(Rules.next_round(5) == 6, "a checkpoint resumes after completed answers")
 
 
 # ---------------------------------------------------------- run checkpoints
@@ -181,7 +184,7 @@ func _test_checkpoints() -> void:
 	check(Rules.validate_checkpoint("garbage", bank).is_empty(), "a non-dictionary checkpoint is dropped")
 	check(Rules.validate_checkpoint({}, bank).is_empty(), "an empty checkpoint is dropped")
 	var before_answer := Rules.make_checkpoint(
-		["q1", "q2", "q3", "q4"], 3, 0, 1, 0, 0, 0, 4,
+		["q1", "q2", "q3", "q4"], 3, 0, 0, 0, 0, 0, 4,
 		[], 0, ["q1", "q2", "q3", "q4"])
 	check(not Rules.validate_checkpoint(before_answer, bank).is_empty(), "leaving before the first answer preserves the sampled run")
 
@@ -1164,6 +1167,55 @@ func _press_key(node, keycode: int) -> void:
 	event.keycode = keycode
 	event.pressed = true
 	node._unhandled_input(event)
+
+
+# ------------------------------------------------ checkpoint resume round
+
+## Leaving while a displayed question is still unanswered must put that
+## question back at the front without advancing the round. This exercises the
+## real battle scene and persisted checkpoint, then restores it exactly as a
+## browser reload does.
+func _test_checkpoint_resume_round() -> void:
+	print("[checkpoint_resume_round]")
+	var game = _game_autoload()
+	var snap_save = _snapshot_file(GameState.SAVE_PATH)
+	var snap_data: Dictionary = game.save_data.duplicate(true)
+	var snap_selected: String = game.selected_battle_id
+	game.selected_battle_id = "d0"
+	game.clear_battle_checkpoint("d0")
+
+	var packed: PackedScene = load("res://scenes/battle.tscn")
+	var instance = packed.instantiate()
+	root.add_child(instance)
+	await process_frame
+	await process_frame
+
+	var first_id := String(instance.current_q.get("id", ""))
+	check(instance.questions_seen == 1, "fresh battle displays round 1")
+	instance._write_checkpoint()
+	var checkpoint: Dictionary = game.battle_checkpoint("d0")
+	check(not checkpoint.is_empty(), "unanswered first round writes a valid checkpoint")
+	check(int(checkpoint.get("answered", -1)) == 0, "unanswered round is not counted as completed")
+	check(String(checkpoint.get("queue", [""])[0]) == first_id, "unanswered question returns to the front of the checkpoint queue")
+
+	instance.queue_free()
+	await process_frame
+	var resumed = packed.instantiate()
+	root.add_child(resumed)
+	await process_frame
+	await process_frame
+	check(resumed.questions_seen == 0, "checkpoint restores the number of completed answers")
+	check(is_instance_valid(resumed.dialog), "restored battle offers the resume dialog")
+	resumed._close_dialog()
+	resumed._next_question()
+	await process_frame
+	check(resumed.questions_seen == 1, "resuming an unanswered checkpoint stays on round 1")
+	check(String(resumed.current_q.get("id", "")) == first_id, "resume reopens the same unanswered question")
+
+	resumed.queue_free()
+	game.save_data = snap_data
+	game.selected_battle_id = snap_selected
+	_restore_file(GameState.SAVE_PATH, snap_save)
 
 
 # ------------------------------------------------------- retreat confirmation

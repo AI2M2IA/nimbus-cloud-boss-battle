@@ -33,6 +33,13 @@ static func regen_heart(streak: int) -> bool:
 	return streak > 0 and streak % REGEN_EVERY == 0
 
 
+## A checkpoint stores completed answers, while the resume UI describes the
+## question that will be shown next. Keeping this conversion in the rules
+## module prevents the dialog and restored HUD from drifting by one round.
+static func next_round(answered: int) -> int:
+	return maxi(answered, 0) + 1
+
+
 ## Distance to reinsert a missed question, scaled to how much queue is left.
 ## A fixed small offset means a miss in a long queue always comes right back
 ## in a couple of questions, which reads as "stuck on this one" rather than
@@ -136,7 +143,7 @@ static func validate_checkpoint(data, bank_ids: Dictionary) -> Dictionary:
 			or streak == null or xp_earned == null or total == null \
 			or first_try_correct == null:
 		return {}
-	if hearts < 1 or streak < 0 or xp_earned < 0 or answered < 1 or answered < correct \
+	if hearts < 1 or streak < 0 or xp_earned < 0 or answered < 0 or answered < correct \
 			or first_try_correct < 0 or first_try_correct > correct:
 		return {}
 	if total <= 0 or correct < 0 or pool_ids.size() != total \

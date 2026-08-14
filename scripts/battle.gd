@@ -322,14 +322,19 @@ func _write_checkpoint() -> void:
 	if _ended:
 		return
 	var ids: Array = []
+	var answered := questions_seen
 	if not current_q.is_empty() and not question_view.answered:
 		ids.append(String(current_q.get("id", "")))
+		# This question has only been displayed, not answered. It returns at
+		# the front of the queue, so the restored _next_question() must advance
+		# back to this same round instead of skipping one.
+		answered = maxi(questions_seen - 1, 0)
 	for q in queue:
 		ids.append(String(q.get("id", "")))
 	if ids.is_empty():
 		return
 	Game.save_battle_checkpoint(String(battle["id"]), Rules.make_checkpoint(
-		ids, hearts, correct_done, questions_seen, streak, best_streak, xp_earned,
+		ids, hearts, correct_done, answered, streak, best_streak, xp_earned,
 		total_unique, attempted.keys(), first_try_correct, battle_pool_ids))
 
 
@@ -379,7 +384,7 @@ func _on_retreat_pressed() -> void:
 func _show_resume_dialog(checkpoint: Dictionary) -> void:
 	_show_dialog(
 		Game.t("battle.resume_title"),
-		Game.t("battle.resume_prompt") % [int(checkpoint["answered"]), int(checkpoint["queue"].size()), int(checkpoint["hearts"])],
+		Game.t("battle.resume_prompt") % [Rules.next_round(int(checkpoint["answered"])), int(checkpoint["queue"].size()), int(checkpoint["hearts"])],
 		[
 			{"text": Game.t("battle.resume"), "color": boss_color.darkened(0.4), "on_pressed": func() -> void:
 				_close_dialog()
