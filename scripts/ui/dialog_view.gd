@@ -26,7 +26,8 @@ static func show(parent: Control, title: String, body: String, actions: Array) -
 
 	var panel := PanelContainer.new()
 	panel.add_theme_stylebox_override("panel", UITheme.panel_box(UITheme.PANEL, 16, 28))
-	panel.custom_minimum_size = Vector2(520, 0)
+	var available_width := maxf(parent.get_viewport_rect().size.x - 32.0, 240.0)
+	panel.custom_minimum_size = Vector2(minf(520.0, available_width), 0)
 	center.add_child(panel)
 
 	var box := VBoxContainer.new()
@@ -34,10 +35,12 @@ static func show(parent: Control, title: String, body: String, actions: Array) -
 	panel.add_child(box)
 
 	var title_label := UITheme.label(title, 24, UITheme.ACCENT)
+	title_label.accessibility_name = title
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title_label)
 
 	var body_label := UITheme.label(body, 15, UITheme.TEXT)
+	body_label.accessibility_description = body
 	body_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(body_label)

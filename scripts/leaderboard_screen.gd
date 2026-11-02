@@ -4,6 +4,7 @@ extends Control
 
 const Leaderboard := preload("res://scripts/leaderboard.gd")
 const UITheme := preload("res://scripts/ui_theme.gd")
+const UILayout := preload("res://scripts/ui_layout.gd")
 
 ## Board colors follow the mode cards; "boss" uses the accent orange.
 const BOARD_COLORS := {
@@ -12,6 +13,9 @@ const BOARD_COLORS := {
 	"pet": "#3ecf8e",
 	"boss": "#ff9900",
 }
+
+var _margin: MarginContainer
+var _grid: GridContainer
 
 
 func _ready() -> void:
@@ -25,19 +29,15 @@ func _ready() -> void:
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scroll)
 
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 48)
-	margin.add_theme_constant_override("margin_right", 48)
-	margin.add_theme_constant_override("margin_top", 32)
-	margin.add_theme_constant_override("margin_bottom", 32)
-	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.add_child(margin)
+	_margin = MarginContainer.new()
+	_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_margin)
 
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 18)
 	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	margin.add_child(root)
+	_margin.add_child(root)
 
 	var title := UITheme.label(Game.t("lb.title"), 42, UITheme.ACCENT)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -48,15 +48,14 @@ func _ready() -> void:
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root.add_child(sub)
 
-	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", 18)
-	grid.add_theme_constant_override("v_separation", 18)
-	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	root.add_child(grid)
+	_grid = GridContainer.new()
+	_grid.add_theme_constant_override("h_separation", 18)
+	_grid.add_theme_constant_override("v_separation", 18)
+	_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_child(_grid)
 
 	for mode_key in Leaderboard.MODES:
-		grid.add_child(_make_board(String(mode_key)))
+		_grid.add_child(_make_board(String(mode_key)))
 
 	var back := Button.new()
 	back.text = Game.t("battle.back")
@@ -67,6 +66,20 @@ func _ready() -> void:
 	back_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	back_row.add_child(back)
 	root.add_child(back_row)
+
+	get_viewport().size_changed.connect(_apply_responsive_layout)
+	_apply_responsive_layout()
+
+
+func _apply_responsive_layout() -> void:
+	var width := get_viewport_rect().size.x
+	var breakpoint_width := UILayout.logical_viewport_width(width)
+	var side_margin := 20 if width < 600.0 else (32 if width < 900.0 else 48)
+	for side in ["margin_left", "margin_right"]:
+		_margin.add_theme_constant_override(side, side_margin)
+	_margin.add_theme_constant_override("margin_top", 24 if width < 600.0 else 32)
+	_margin.add_theme_constant_override("margin_bottom", 24 if width < 600.0 else 32)
+	_grid.columns = UILayout.responsive_columns(width, 360.0, 2, side_margin * 2.0, 18.0, breakpoint_width)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -87,7 +100,7 @@ func _make_board(mode_key: String) -> PanelContainer:
 	var card := PanelContainer.new()
 	card.add_theme_stylebox_override("panel", UITheme.panel_box(UITheme.PANEL, 14, 18))
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	card.custom_minimum_size = Vector2(520, 220)
+	card.custom_minimum_size = Vector2(280, 220)
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)

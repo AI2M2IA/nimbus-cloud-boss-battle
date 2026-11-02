@@ -7,6 +7,7 @@ extends Control
 
 const QuizImport := preload("res://scripts/quiz_import.gd")
 const UITheme := preload("res://scripts/ui_theme.gd")
+const DialogView := preload("res://scripts/ui/dialog_view.gd")
 
 var pool_box: VBoxContainer
 var import_name_edit: LineEdit
@@ -21,6 +22,7 @@ var answers_edit: LineEdit
 var explanation_edit: TextEdit
 var domain_spin: SpinBox
 var add_status: Label
+var active_dialog: Control
 
 
 func _ready() -> void:
@@ -87,7 +89,10 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.is_echo():
 		if (event as InputEventKey).keycode == KEY_ESCAPE:
-			get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+			if is_instance_valid(active_dialog):
+				_close_dialog()
+			else:
+				get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 			get_viewport().set_input_as_handled()
 
 
@@ -119,13 +124,14 @@ func _refresh_pool_list() -> void:
 		pool_box.add_child(_make_pool_row(String(s["id"]), String(s["name"]), qs.size()))
 
 
-func _make_pool_row(set_id: String, set_name: String, count: int) -> HBoxContainer:
+func _make_pool_row(set_id: String, set_name: String, count: int) -> HFlowContainer:
 	var active: bool = Game.active_set_id() == set_id
-	var row := HBoxContainer.new()
+	var row := HFlowContainer.new()
 	row.add_theme_constant_override("separation", 12)
 
 	var name_label := UITheme.label(set_name, 16, UITheme.GOOD if active else UITheme.TEXT)
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.custom_minimum_size = Vector2(180, 0)
 	row.add_child(name_label)
 	row.add_child(UITheme.label(Game.t("custom.set_stats") % count, 14, UITheme.TEXT_DIM))
 
@@ -145,13 +151,32 @@ func _make_pool_row(set_id: String, set_name: String, count: int) -> HBoxContain
 		remove_btn.text = Game.t("custom.remove")
 		remove_btn.add_theme_font_size_override("font_size", UITheme.fs(13))
 		UITheme.style_button(remove_btn, UITheme.BAD.darkened(0.45))
-		var on_remove := func() -> void:
-			Game.remove_custom_set(set_id)
-			_refresh_pool_list()
+		var on_remove := func() -> void: _confirm_remove(set_id, set_name)
 		remove_btn.pressed.connect(on_remove)
 		row.add_child(remove_btn)
 
 	return row
+
+
+func _confirm_remove(set_id: String, set_name: String) -> void:
+	if is_instance_valid(active_dialog):
+		return
+	active_dialog = DialogView.show(self, Game.t("custom.remove_title"),
+		Game.t("custom.remove_prompt") % set_name, [
+			{"text": Game.t("custom.cancel"), "color": UITheme.PANEL_LIGHT, "on_pressed": _close_dialog},
+			{"text": Game.t("custom.remove"), "color": UITheme.BAD.darkened(0.45), "on_pressed": _remove_confirmed.bind(set_id)},
+		])
+
+
+func _remove_confirmed(set_id: String) -> void:
+	Game.remove_custom_set(set_id)
+	_close_dialog()
+	_refresh_pool_list()
+
+
+func _close_dialog() -> void:
+	DialogView.close(active_dialog)
+	active_dialog = null
 
 
 # -------------------------------------------------------------- bulk import
@@ -170,12 +195,13 @@ func _make_import_panel() -> PanelContainer:
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(hint)
 
-	var name_row := HBoxContainer.new()
+	var name_row := HFlowContainer.new()
 	name_row.add_theme_constant_override("separation", 8)
 	box.add_child(name_row)
 
 	import_name_edit = LineEdit.new()
 	import_name_edit.placeholder_text = Game.t("custom.set_name")
+	import_name_edit.accessibility_name = Game.t("custom.set_name")
 	import_name_edit.custom_minimum_size = Vector2(260, 0)
 	name_row.add_child(import_name_edit)
 
@@ -191,6 +217,7 @@ func _make_import_panel() -> PanelContainer:
 
 	import_text = TextEdit.new()
 	import_text.placeholder_text = '{"questions": [ ... ]}'
+	import_text.accessibility_name = Game.t("custom.import_title")
 	import_text.custom_minimum_size = Vector2(0, 160)
 	import_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_child(import_text)
@@ -261,11 +288,13 @@ func _make_add_panel() -> PanelContainer:
 
 	add_name_edit = LineEdit.new()
 	add_name_edit.placeholder_text = Game.t("custom.set_name")
+	add_name_edit.accessibility_name = Game.t("custom.set_name")
 	add_name_edit.custom_minimum_size = Vector2(260, 0)
 	box.add_child(add_name_edit)
 
 	box.add_child(UITheme.label(Game.t("custom.stem"), 14, UITheme.TEXT_DIM))
 	stem_edit = TextEdit.new()
+	stem_edit.accessibility_name = Game.t("custom.stem")
 	stem_edit.custom_minimum_size = Vector2(0, 80)
 	stem_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_child(stem_edit)
@@ -274,26 +303,30 @@ func _make_add_panel() -> PanelContainer:
 	for key in QuizImport.OPTION_KEYS:
 		var opt_edit := LineEdit.new()
 		opt_edit.placeholder_text = Game.t("custom.option") % key
+		opt_edit.accessibility_name = Game.t("custom.option") % key
 		box.add_child(opt_edit)
 		option_edits.append(opt_edit)
 
-	var meta_row := HBoxContainer.new()
+	var meta_row := HFlowContainer.new()
 	meta_row.add_theme_constant_override("separation", 8)
 	box.add_child(meta_row)
 
 	answers_edit = LineEdit.new()
 	answers_edit.placeholder_text = Game.t("custom.answers")
+	answers_edit.accessibility_name = Game.t("custom.answers")
 	answers_edit.custom_minimum_size = Vector2(260, 0)
 	meta_row.add_child(answers_edit)
 
 	meta_row.add_child(UITheme.label(Game.t("custom.domain"), 14, UITheme.TEXT_DIM))
 	domain_spin = SpinBox.new()
+	domain_spin.accessibility_name = Game.t("custom.domain")
 	domain_spin.min_value = 0
 	domain_spin.max_value = 4
 	meta_row.add_child(domain_spin)
 
 	box.add_child(UITheme.label(Game.t("custom.explanation"), 14, UITheme.TEXT_DIM))
 	explanation_edit = TextEdit.new()
+	explanation_edit.accessibility_name = Game.t("custom.explanation")
 	explanation_edit.custom_minimum_size = Vector2(0, 60)
 	explanation_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_child(explanation_edit)

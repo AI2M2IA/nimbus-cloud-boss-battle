@@ -1,6 +1,6 @@
 # Nimbus Cloud Boss Battle
 
-A gamified version of the SAA-C03 practice exam from *Let's Learn AWS Together*, built with Godot 4. Each exam domain is a boss fight.
+A gamified version of the SAA-C03 practice exam from *Let's Build on AWS Together*, built with Godot 4. Each exam domain is a boss fight.
 
 ## Play it
 
@@ -22,7 +22,7 @@ A signed, auto-updating build for **Steam and itch.io** is planned and will be a
 
 ## How it plays
 
-Pick a boss on the menu — one per exam domain, plus a cross-domain warm-up and the Final Gauntlet (all 65 exam questions):
+Pick a boss on the menu — one per exam domain, plus a cross-domain warm-up and the Final Gauntlet (all 65 exam questions). Each domain encounter draws a fresh 25-question sample, keeping sessions focused while replays expose more of the bank:
 
 | Boss | Domain |
 |---|---|
@@ -46,7 +46,7 @@ Mechanics, designed for learning:
 Besides the boss battles, the main menu offers three modes that draw from the full question pool (all domains, shuffled; each question is asked at most once per run — no requeue):
 
 - **Survival** — three wrong answers end the run. No heart regen, no second chances. Score is how many questions you answered correctly.
-- **Points Decay** — start with **1000 points**; a wrong answer costs **100**, a correct one earns **50**. The pool is clamped at 0, and hitting 0 ends the run. Reaching the **100-question cap** ends the run as a win with whatever points are left.
+- **Points Decay** — start with **1000 points**; a wrong answer costs **100**, a correct one earns **50**. The pool is clamped at 0, and hitting 0 ends the run. Reaching the **50-question cap** ends the run as a win with whatever points are left.
 - **Save the Pet** — pick a pet (cat, dog, parrot, fish, or hamster) on the menu card. **20 correct answers save it** (the goal scales down to the pool size for smaller custom sets); **3 wrong answers** and the pet is lost. A loss takes precedence if both thresholds are hit. The chosen pet appears on screen as a small animated cartoon avatar and reacts to correct and wrong answers.
 
 All modes keep the combo/XP rules from the boss battles, show every explanation, and record a per-mode best score and attempt count in the save file. Runs that draw from a player-authored custom set are practice only: they award no XP and no leaderboard entry. The thresholds live in `scripts/mode_rules.gd` as pure, unit-tested functions.
@@ -73,7 +73,9 @@ Script-coverage note: subsetted Noto fonts for the CJK, Arabic, Hebrew, Indic, T
 
 ## Accessibility
 
-A text-size control (**A− / A / A+**) sits next to the language picker: shrink, reset to default, or enlarge all in-game text. The scale (0.85×–1.5×) persists in the save and applies on startup across every screen.
+A text-size control (**A− / A / A+**) sits next to the language picker: shrink, reset to default, or enlarge all in-game text. The scale (0.85×–2×) persists in the save and applies on startup across every screen. A persisted **Reduce motion** option disables card flips, hit tweens, pet bobbing, and reaction shakes.
+
+Desktop builds expose Godot's native accessibility names and descriptions to supported assistive technologies. The Web export preserves browser zoom and provides meaningful metadata and a download fallback, but the game itself is rendered in a canvas; use a desktop build when full screen-reader integration is required.
 
 ## Run it
 
@@ -90,7 +92,8 @@ From a terminal, `./godot.sh` launches the project and `./run-game.sh` is kept a
 3. Set the export path (e.g. `build/web/index.html`) → Export Project.
 4. Serve the folder over HTTP (browsers block `file://` for wasm):
    `python3 -m http.server -d build/web 8000` → open http://localhost:8000
-5. For GitHub Pages: commit the exported files. If the page hangs on load, add a `coi-serviceworker` shim or set the export's "Head Include" per Godot's [Web export docs](https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_web.html) (Pages can't send the COOP/COEP headers Godot's threads need; in Export → Web you can also disable "Thread Support" to avoid this entirely).
+5. Run `python3 scripts/dev/harden_web_export.py build/web/index.html` to preserve browser zoom and add the accessible fallback metadata used by CI.
+6. For GitHub Pages: commit the exported files. If the page hangs on load, add a `coi-serviceworker` shim or set the export's "Head Include" per Godot's [Web export docs](https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_web.html) (Pages can't send the COOP/COEP headers Godot's threads need; in Export → Web you can also disable "Thread Support" to avoid this entirely).
 
 ## Unit tests
 
@@ -104,7 +107,9 @@ You can also pass raw Godot arguments through the shortcut, for example `./godot
 
 ## Updating the questions
 
-`data/questions.json` is a copy of `docs/api/questions.json` from the book site, plus supplemental batches appended over time. To sync after editing the book's exam-prep questions, just copy the file over again — the game reads it at startup, nothing else to change.
+`data/questions.json` combines the English book's `docs/api/questions.json` with game-specific supplemental questions. To sync a book revision, merge the book records by their stable question IDs, updating each complete record (stem, options, answer keys, explanations, hints, and domain/task tags). Preserve the existing game-only questions and IDs; replacing the entire file with the book export would discard the supplemental bank. Review supplemental questions for the same corrected concepts instead of assuming that updating shared IDs fixes every occurrence.
+
+Sync `data/flashcards.json` from the English book's generated flashcard export, regenerate the question summary below, and run `./run-tests.sh`. This updates source data; the browser and desktop builds must be exported again to include it. A source-data sync does not publish or deploy a new game build.
 
 The file also carries a summary block (`generatedAt` / `contentHash` / `counts`) at the top. After any manual edit to the `questions` array, regenerate that block with:
 

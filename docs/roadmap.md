@@ -26,7 +26,7 @@ Acceptance criteria:
 - The checklist has no local machine paths, personal identity data, or conflicting license language.
 - The checklist references this project's actual scripts and file layout.
 
-## Phase 2: Static Audit
+## Phase 2: Static Audit (Complete)
 
 Goal: catch risky artifacts before a commit or release.
 
@@ -38,7 +38,7 @@ Goal: catch risky artifacts before a commit or release.
 Acceptance criteria:
 - The audit runs locally without network access.
 - The audit avoids false positives in legitimate localized string files.
-- `./run-tests.sh` can optionally call the audit once it is stable.
+- `./run-tests.sh` calls the audit before running tests.
 
 ## Phase 3: Progress And Badges
 

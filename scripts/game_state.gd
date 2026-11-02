@@ -10,11 +10,12 @@ const QUESTIONS_PATH := "res://data/questions.json"
 const SAVE_PATH := "user://save.json"
 const FLASHCARDS_PATH := "res://data/flashcards.json"
 const TEXT_SCALE_MIN := 0.85
-const TEXT_SCALE_MAX := 1.5
+const TEXT_SCALE_MAX := 2.0
 const TEXT_SCALE_STEP := 0.15
 const CUSTOM_SETS_PATH := "user://custom_sets.json"
 const LEADERBOARD_PATH := "user://leaderboard.json"
 const GATEKEEPER_SAMPLE_PER_DOMAIN := 2
+const DOMAIN_BATTLE_SAMPLE_SIZE := 25
 const MAX_PERSISTED_FILE_BYTES := 4000000
 
 ## Boss names stay in English in every locale (creative proper nouns, same
@@ -71,16 +72,15 @@ const BATTLES := [
 ]
 
 ## Rank thresholds in XP, ascending; each entry is [min_xp, i18n key].
-## Rebalanced for the 662-question bank: a perfect run on a big boss yields
-## ~42k XP, so the top rank now takes roughly ten flawless boss runs instead
-## of a single one.
+## Tuned for focused 25-question domain encounters. Existing XP is preserved;
+## these thresholds only make progression match the shorter learning sessions.
 const RANKS := [
 	[0, "rank.novice"],
-	[10000, "rank.rookie"],
-	[40000, "rank.az"],
-	[100000, "rank.wa"],
-	[200000, "rank.champion"],
-	[400000, "rank.hero"],
+	[5000, "rank.rookie"],
+	[15000, "rank.az"],
+	[35000, "rank.wa"],
+	[65000, "rank.champion"],
+	[100000, "rank.hero"],
 ]
 
 ## Locales written right-to-left; drives layout_direction on scene roots.
@@ -134,6 +134,7 @@ const LANGS := [
 var questions: Array = []
 var flashcards: Array = []
 var text_scale: float = 1.0
+var reduced_motion: bool = false
 var save_data: Dictionary = {"xp": 0, "battles": {}}
 var selected_battle_id: String = "d0"
 var selected_mode: String = "survival"
@@ -155,6 +156,7 @@ func _ready() -> void:
 	_load_leaderboard()
 	_fallback = _load_lang_file("en")
 	text_scale = clampf(float(save_data.get("text_scale", 1.0)), TEXT_SCALE_MIN, TEXT_SCALE_MAX)
+	reduced_motion = bool(save_data.get("reduced_motion", false))
 	lang = String(save_data.get("lang", "en"))
 	if not _is_known_lang(lang):
 		# A hand-edited save could put anything here (and it gets concatenated
@@ -243,6 +245,8 @@ func questions_for_battle(id: String) -> Array:
 			if int(q.get("domain", -99)) == int(battle["domain"]):
 				pool.append(q)
 	pool.shuffle()
+	if id in ["d1", "d2", "d3", "d4"] and pool.size() > DOMAIN_BATTLE_SAMPLE_SIZE:
+		pool = pool.slice(0, DOMAIN_BATTLE_SAMPLE_SIZE)
 	return pool
 
 
@@ -625,6 +629,8 @@ func _sanitize_save_data(raw: Dictionary) -> Dictionary:
 	var ts = raw.get("text_scale")
 	if (typeof(ts) == TYPE_INT or typeof(ts) == TYPE_FLOAT) and is_finite(float(ts)):
 		clean["text_scale"] = clampf(float(ts), TEXT_SCALE_MIN, TEXT_SCALE_MAX)
+	if typeof(raw.get("reduced_motion")) == TYPE_BOOL:
+		clean["reduced_motion"] = bool(raw["reduced_motion"])
 	var saved_lang := String(raw.get("lang", "")) if typeof(raw.get("lang")) == TYPE_STRING else ""
 	if _is_known_lang(saved_lang):
 		clean["lang"] = saved_lang
@@ -734,4 +740,9 @@ func adjust_text_scale(delta: float) -> float:
 func reset_text_scale() -> void:
 	text_scale = 1.0
 	save_data["text_scale"] = 1.0
+	_write_save()
+
+func set_reduced_motion(enabled: bool) -> void:
+	reduced_motion = enabled
+	save_data["reduced_motion"] = enabled
 	_write_save()

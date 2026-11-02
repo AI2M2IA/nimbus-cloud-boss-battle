@@ -20,6 +20,7 @@ var _progress: Label
 var _action_row: HBoxContainer
 var _got_btn: Button
 var _again_btn: Button
+var _margin: MarginContainer
 
 
 func _ready() -> void:
@@ -42,14 +43,20 @@ func _build_ui() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	add_child(scroll)
+
+	_margin = MarginContainer.new()
+	_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_margin)
 
 	var col := VBoxContainer.new()
-	col.custom_minimum_size = Vector2(640, 0)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.add_theme_constant_override("separation", 16)
-	center.add_child(col)
+	_margin.add_child(col)
 
 	col.add_child(UITheme.label(Game.t("flashcards.title"), 26, UITheme.ACCENT))
 
@@ -57,7 +64,8 @@ func _build_ui() -> void:
 	col.add_child(_progress)
 
 	_card_btn = Button.new()
-	_card_btn.custom_minimum_size = Vector2(620, 220)
+	_card_btn.custom_minimum_size = Vector2(0, 220)
+	_card_btn.accessibility_description = Game.t("flashcards.flip_hint")
 	_card_btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_card_btn.clip_text = false
 	_card_btn.add_theme_font_size_override("font_size", UITheme.fs(20))
@@ -94,6 +102,18 @@ func _build_ui() -> void:
 	UITheme.style_button(back, UITheme.PANEL_LIGHT)
 	back.pressed.connect(_on_back)
 	col.add_child(back)
+
+	get_viewport().size_changed.connect(_apply_responsive_layout)
+	_apply_responsive_layout()
+
+
+func _apply_responsive_layout() -> void:
+	var width := get_viewport_rect().size.x
+	var side_margin := 20 if width < 600.0 else (64 if width < 900.0 else 220)
+	for side in ["margin_left", "margin_right"]:
+		_margin.add_theme_constant_override(side, side_margin)
+	_margin.add_theme_constant_override("margin_top", 32)
+	_margin.add_theme_constant_override("margin_bottom", 32)
 
 
 func _show_current(animate: bool = false) -> void:
@@ -134,6 +154,11 @@ func _on_card_pressed() -> void:
 
 
 func _flip_card(new_text: String) -> void:
+	if Game.reduced_motion:
+		_card_btn.text = new_text
+		_card_btn.scale = Vector2.ONE
+		_animating = false
+		return
 	_animating = true
 	_card_btn.pivot_offset = _card_btn.size * 0.5
 	var tw := create_tween()
