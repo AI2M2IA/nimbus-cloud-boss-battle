@@ -24,11 +24,16 @@ const UITheme := preload("res://scripts/ui_theme.gd")
 signal answer_submitted(chosen: Array)
 signal continue_requested
 
+const OVERFLOW_LAYOUT_MIN_FRAMES := 6
+const OVERFLOW_LAYOUT_MAX_FRAMES := 12
+const OVERFLOW_LAYOUT_STABLE_FRAMES := 2
+
 var current_q: Dictionary = {}
 var selected_keys: Array = []
 var answered: bool = false
 var option_buttons: Dictionary = {}
 var option_order: Array = []
+var _overflow_refresh_generation := 0
 
 var scroll: ScrollContainer
 var badge_label: Label
@@ -171,17 +176,39 @@ func show_question(question: Dictionary, badge_suffix: String = "") -> void:
 
 
 ## Shows/hides the "more below" cue once layout settles on the new content.
-## Not awaited by callers -- it updates overflow_hint whenever it resolves.
-## The extra frame gives the theme's fallback-font chain time to shape on
-## first use; with only two frames the scrollbar metrics were occasionally
-## stale when this ran right after a scene loaded.
+## Not awaited by normal callers -- it updates overflow_hint whenever it
+## resolves. Godot recalculates RichTextLabel minimum sizes and container
+## scroll ranges over several deferred layout passes, especially while the
+## fallback-font chain is first shaped. A bounded stability check avoids
+## reading a stale range after an arbitrary fixed number of frames. The
+## generation guard prevents an older refresh from overwriting a newer one.
 func _refresh_overflow_hint() -> void:
-	await get_tree().process_frame
-	await get_tree().process_frame
-	await get_tree().process_frame
 	if not is_instance_valid(scroll):
 		return
+	_overflow_refresh_generation += 1
+	var generation := _overflow_refresh_generation
 	var bar := scroll.get_v_scroll_bar()
+	var initial_metrics := Vector2(bar.max_value, bar.page)
+	var previous_metrics := initial_metrics
+	var observed_change := false
+	var stable_frames := 0
+
+	for frame_index in range(OVERFLOW_LAYOUT_MAX_FRAMES):
+		await get_tree().process_frame
+		if generation != _overflow_refresh_generation or not is_instance_valid(scroll):
+			return
+		bar = scroll.get_v_scroll_bar()
+		var metrics := Vector2(bar.max_value, bar.page)
+		observed_change = observed_change or not metrics.is_equal_approx(initial_metrics)
+		if metrics.is_equal_approx(previous_metrics):
+			stable_frames += 1
+		else:
+			previous_metrics = metrics
+			stable_frames = 0
+		if frame_index + 1 >= OVERFLOW_LAYOUT_MIN_FRAMES \
+				and observed_change and stable_frames >= OVERFLOW_LAYOUT_STABLE_FRAMES:
+			break
+
 	overflow_hint.visible = bar.max_value > bar.page
 
 
