@@ -1,6 +1,6 @@
 # Nimbus Cloud Boss Battle
 
-A gamified version of the SAA-C03 practice exam from *Let's Learn AWS Together*, built with Godot 4. Each exam domain is a boss fight.
+A gamified version of the SAA-C03 practice exam from *Let's Build on AWS Together*, built with Godot 4. Each exam domain is a boss fight.
 
 ## Play it
 
@@ -107,7 +107,9 @@ You can also pass raw Godot arguments through the shortcut, for example `./godot
 
 ## Updating the questions
 
-`data/questions.json` is a copy of `docs/api/questions.json` from the book site, plus supplemental batches appended over time. To sync after editing the book's exam-prep questions, just copy the file over again — the game reads it at startup, nothing else to change.
+`data/questions.json` combines the English book's `docs/api/questions.json` with game-specific supplemental questions. To sync a book revision, merge the book records by their stable question IDs, updating each complete record (stem, options, answer keys, explanations, hints, and domain/task tags). Preserve the existing game-only questions and IDs; replacing the entire file with the book export would discard the supplemental bank. Review supplemental questions for the same corrected concepts instead of assuming that updating shared IDs fixes every occurrence.
+
+Sync `data/flashcards.json` from the English book's generated flashcard export, regenerate the question summary below, and run `./run-tests.sh`. This updates source data; the browser and desktop builds must be exported again to include it. A source-data sync does not publish or deploy a new game build.
 
 The file also carries a summary block (`generatedAt` / `contentHash` / `counts`) at the top. After any manual edit to the `questions` array, regenerate that block with:
 
